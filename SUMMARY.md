@@ -6,37 +6,38 @@
 
 * [Quickstart](getting-started/quickstart.md)
 * [Connect Your Wallet](getting-started/connect-wallet.md)
-* [Understanding Fees](getting-started/fees.md)
 
-## For Traders
+## Yoink
 
-* [Trading Guide](traders/trading-guide.md)
-* [How to Buy Tokens](traders/how-to-buy.md)
-* [How to Sell Tokens](traders/how-to-sell.md)
-* [Early Bird Bonus](traders/early-bird-bonus.md)
+* [How to Trade](traders/trading-guide.md)
+* [What is Graduation](features/graduation.md)
+* [How to Create a Coin](creators/create-token.md)
+* [How to Attach a Stream](creators/going-live.md)
+* [Streamer Profiles](creators/streamer-profiles.md)
+* [Streamer Verification](creators/verify-account.md)
+* [User Profiles](users/user-profiles.md)
+
+## Features
+
+* [Autobuyback](features/buybacks.md)
+* [Constant Burn](features/constant-burn.md)
+* [Early Seats](features/early-birds.md)
+
+## $Yoink
+
+* [How it Launched](tokenomics/yoink-launch.md)
+* [Roadmap](tokenomics/roadmap.md)
+* [Constant Buyback](tokenomics/buyback-burn.md)
+
+## Leaderboards
+
 * [Leaderboards](traders/leaderboards.md)
+* [Fee System](tokenomics/fees.md)
+* [How Fees are Obtained](getting-started/fee-distribution.md)
 
-## For Creators
+## Socials
 
-* [Creator Guide](creators/creator-guide.md)
-* [How to Create a Token](creators/create-token.md)
-* [Verify Your Account](creators/verify-account.md)
-* [Claim Your Rewards](creators/claim-rewards.md)
-* [Going Live](creators/going-live.md)
-
-## Platform Features
-
-* [Automatic Buybacks](features/buybacks.md)
-* [Early Bird Mechanism](features/early-birds.md)
-* [Trading Charts](features/charts.md)
-* [Real-time Updates](features/real-time.md)
-* [Bonding Curve](features/bonding-curve.md)
-
-## Tokenomics
-
-* [Yoink Token](tokenomics/yoink-token.md)
-* [Fee Structure](tokenomics/fees.md)
-* [Buyback & Burn](tokenomics/buyback-burn.md)
+* [Community Links](support/socials.md)
 
 ## Support
 

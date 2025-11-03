@@ -30,7 +30,7 @@ Yoink is a creator capital markets token launch platform on Solana. Traders can 
 
 ### Jump right in
 
-<table data-view="cards"><thead><tr><th></th><th></th><th></th><th data-hidden data-card-target data-type="content-ref"></th></tr></thead><tbody><tr><td><strong>🚀 Getting Started</strong></td><td>Learn how to connect your wallet and start trading</td><td></td><td><a href="getting-started/quickstart.md">quickstart.md</a></td></tr><tr><td><strong>💰 For Traders</strong></td><td>Discover how to trade creator tokens and earn rewards</td><td></td><td><a href="traders/trading-guide.md">trading-guide.md</a></td></tr><tr><td><strong>🎨 For Creators</strong></td><td>Learn how to claim your rewards and verify your account</td><td></td><td><a href="creators/creator-guide.md">creator-guide.md</a></td></tr></tbody></table>
+<table data-view="cards"><thead><tr><th></th><th></th><th></th><th data-hidden data-card-target data-type="content-ref"></th></tr></thead><tbody><tr><td><strong>🚀 Getting Started</strong></td><td>Connect your wallet and start trading on Yoink</td><td></td><td><a href="getting-started/quickstart.md">quickstart.md</a></td></tr><tr><td><strong>� Trading Guide</strong></td><td>Learn how to trade creator tokens and understand graduation</td><td></td><td><a href="traders/trading-guide.md">trading-guide.md</a></td></tr><tr><td><strong>� Features</strong></td><td>Explore autobuyback, constant burn, and Early Bird rewards</td><td></td><td><a href="features/buybacks.md">buybacks.md</a></td></tr></tbody></table>
 
 ## Key Features
 
