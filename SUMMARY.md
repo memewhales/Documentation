@@ -7,37 +7,37 @@
 * [Quickstart](getting-started/quickstart.md)
 * [Connect Your Wallet](getting-started/connect-wallet.md)
 
-## Yoink
+## 🚀 Yoink
 
-* [How to Trade](traders/trading-guide.md)
-* [What is Graduation](features/graduation.md)
-* [How to Create a Coin](creators/create-token.md)
-* [How to Attach a Stream](creators/going-live.md)
-* [Streamer Profiles](creators/streamer-profiles.md)
-* [Streamer Verification](creators/verify-account.md)
-* [User Profiles](users/user-profiles.md)
+* [📈 How to Trade](yoink/how-to-trade.md)
+* [🎓 What is Graduation](yoink/what-is-graduation.md)
+* [🪙 How to Create a Coin](yoink/how-to-create-coin.md)
+* [📺 How to Attach a Stream](yoink/how-to-attach-stream.md)
+* [👤 Streamer Profiles](yoink/streamer-profiles.md)
+* [✅ Streamer Verification](yoink/streamer-verification.md)
+* [👥 User Profiles](yoink/user-profiles.md)
 
-## Features
+## ✨ Features
 
-* [Autobuyback](features/buybacks.md)
-* [Constant Burn](features/constant-burn.md)
-* [Early Seats](features/early-birds.md)
+* [💰 Autobuyback](features/autobuyback.md)
+* [🔥 Constant Burn](features/constant-burn.md)
+* [🪑 Early Seats](features/early-seats.md)
 
-## $Yoink
+## 💎 $YOINK
 
-* [How it Launched](tokenomics/yoink-launch.md)
-* [Roadmap](tokenomics/roadmap.md)
-* [Constant Buyback](tokenomics/buyback-burn.md)
+* [🚀 How it Launched](yoink-token/how-it-launched.md)
+* [🗺️ Roadmap](yoink-token/roadmap.md)
+* [💰 Constant Buyback](yoink-token/constant-buyback.md)
 
-## Leaderboards
+## 🏆 Leaderboards
 
-* [Leaderboards](traders/leaderboards.md)
-* [Fee System](tokenomics/fees.md)
-* [How Fees are Obtained](getting-started/fee-distribution.md)
+* [🏅 Leaderboards](traders/leaderboards.md)
+* [💸 Fee System](tokenomics/fees.md)
+* [🧮 How Fees are Obtained](getting-started/fee-distribution.md)
 
-## Socials
+## 🌐 Socials
 
-* [Community Links](support/socials.md)
+* [🔗 Community Links](support/socials.md)
 
 ## Support
 
