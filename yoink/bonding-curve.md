@@ -26,7 +26,7 @@ A **bonding curve** is a mathematical formula that automatically determines toke
 
 * **Instant liquidity** - Always able to buy or sell
 * **Fair pricing** - Transparent, predictable price discovery
-* **No rug pulls** - Liquidity can't be removed by developers
+* **No rug pulls** - Liquidity can't be removed by creators
 * **Automatic market making** - No need for manual liquidity provision
 
 {% hint style="info" %}
@@ -35,81 +35,30 @@ A **bonding curve** is a mathematical formula that automatically determines toke
 
 ## The Mathematical Formula
 
-Yoink uses a **linear bonding curve** with the following formula:
+Yoink uses a **constant product market maker (CPMM)** bonding curve with the following formula:
 
+### Buy Price Formula
 ```
-Price = Base Price + (Current Supply × Price Slope)
-```
-
-### Formula Components
-
-| Component | Description | Example Value |
-|-----------|-------------|---------------|
-| **Base Price** | Starting price for the first token | 0.000001 SOL |
-| **Current Supply** | Number of tokens already minted | 1,000,000 tokens |
-| **Price Slope** | Rate at which price increases | 0.00000001 SOL per token |
-| **Resulting Price** | Price for the next token | 0.000011 SOL |
-
-### Visual Representation
-
-```
-Price (SOL)
-     │
-     │                                    ╱
-     │                                ╱
-     │                            ╱
-     │                        ╱
-     │                    ╱
-     │                ╱
-     │            ╱
-     │        ╱
-     │    ╱
-     │╱
-     └────────────────────────────────── Supply (tokens)
-     0    2M    4M    6M    8M    10M
+SOL Cost = (token_amount × virtual_sol_reserves) / (virtual_token_reserves - token_amount)
 ```
 
-As you can see, the price increases linearly as more tokens are minted, creating predictable price appreciation.
-
-## How Trading Works
-
-### Buying Tokens
-
-When you buy tokens on the bonding curve:
-
-1. **Specify SOL amount** you want to spend
-2. **Formula calculates** how many tokens you'll receive
-3. **Price increases** as tokens are minted
-4. **Your SOL** enters the bonding curve contract
-5. **New tokens** are created and sent to your wallet
-
-**Example Buy Transaction:**
+### Sell Price Formula  
 ```
-Before: 1,000,000 tokens exist at 0.000010 SOL each
-You buy: 10 SOL worth of tokens
-Result: ~900,000 new tokens minted to you
-After: 1,900,000 tokens exist at 0.000019 SOL each
-Price Impact: Your buy increased the token price by 90%
+SOL Output = (token_amount × virtual_sol_reserves) / (virtual_token_reserves + token_amount)
 ```
 
-### Selling Tokens
+### Key Components
 
-When you sell tokens on the bonding curve:
+| Component | Description | Purpose |
+|-----------|-------------|---------|
+| **Virtual Token Reserves** | Theoretical token supply on the curve | Price calculation only |
+| **Virtual SOL Reserves** | Theoretical SOL backing the curve | Price calculation only |
+| **Real Token Reserves** | Actual tokens available for purchase | Physical inventory |
+| **Real SOL Reserves** | Actual SOL backing the tokens | Real liquidity |
 
-1. **Specify token amount** you want to sell
-2. **Formula calculates** how much SOL you'll receive
-3. **Price decreases** as tokens are burned
-4. **Your tokens** are permanently destroyed
-5. **SOL** is released from the contract to your wallet
-
-**Example Sell Transaction:**
-```
-Before: 1,900,000 tokens exist at 0.000019 SOL each
-You sell: 400,000 tokens
-Result: ~7.6 SOL received
-After: 1,500,000 tokens exist at 0.000015 SOL each
-Price Impact: Your sell decreased the token price by 21%
-```
+{% hint style="info" %}
+**Important**: The "virtual" reserves are used purely for pricing calculations and follow the constant product formula. The "real" reserves represent the actual tokens and SOL available on the bonding curve.
+{% endhint %}
 
 ## The Progress Bar System
 
@@ -117,44 +66,31 @@ Every token displays a **progress bar** showing how close it is to "graduation" 
 
 ### Progress Calculation
 
-Progress is based on the token's **market capitalization**:
+Progress is based on **real token reserves depletion**, not market cap:
 
 ```
-Progress % = (Current Market Cap / Target Market Cap) × 100
-Target Market Cap = ~10,000 SOL
+Progress % = (Initial Tokens - Current Real Token Reserves) / Initial Tokens × 100
 ```
 
-### Progress Stages
+**Graduation occurs when**: `real_token_reserves` reaches **0** (all tokens are sold from the curve)
 
-| Progress | Stage | Market Cap | Characteristics |
-|----------|-------|------------|-----------------|
-| **0-25%** | Launch | 0-2,500 SOL | High volatility, early opportunity |
-| **25-50%** | Growth | 2,500-5,000 SOL | Building momentum, community forming |
-| **50-75%** | Trending | 5,000-7,500 SOL | Strong interest, higher volume |
-| **75-95%** | Pre-Graduation | 7,500-9,500 SOL | Anticipation building, less volatility |
-| **95-100%** | Graduation Ready | 9,500-10,000 SOL | Imminent DEX migration |
-
-### What the Progress Bar Shows
-
-The progress bar provides instant visual feedback about:
-
-* **Investment timing** - Earlier = higher risk/reward
-* **Community strength** - Higher progress = more believers
-* **Liquidity depth** - More progress = deeper liquidity
-* **Price stability** - Higher progress = less volatility
-* **Graduation proximity** - How close to DEX migration
+{% hint style="success" %}
+**Key Insight**: Unlike market cap-based systems, Yoink graduation happens when the bonding curve runs out of tokens to sell, ensuring maximum liquidity migration to the DEX.
+{% endhint %}
 
 ## Graduation and DEX Integration
 
 ### When Graduation Occurs
 
-A token automatically graduates when it reaches **~10,000 SOL market cap** (100% progress). This triggers:
+A token automatically graduates when **all tokens are sold from the bonding curve** (`real_token_reserves` = 0). This triggers:
 
 ✅ **Automatic migration** to Raydium DEX  
-✅ **Liquidity pool creation** with permanent liquidity  
+✅ **Liquidity pool creation** with all accumulated SOL  
 ✅ **Standard SPL token** deployment  
 ✅ **Professional trading** features activation  
 ✅ **Ecosystem integration** with all Solana DEXs  
+
+**Key difference**: Graduation is based on **token depletion**, not market cap targets, ensuring maximum community participation before DEX migration.  
 
 ### The Migration Process
 
@@ -196,7 +132,71 @@ A token automatically graduates when it reaches **~10,000 SOL market cap** (100%
 * **Broader exposure** to Solana community
 * **Success validation** for their brand
 
-## Price Impact and Slippage
+## Automatic Buyback System
+
+Yoink features a sophisticated **automatic buyback mechanism** that creates price floors and supports token values:
+
+### How Buybacks Work
+
+1. **Fee Accumulation**: Trading fees accumulate in separate pools:
+   - **Creator Fee Pool** - For creator rewards
+   - **Treasury Fee Pool** - For buybacks and platform operations  
+   - **Early Bird Pool** - For early supporter rewards
+   - **Platform Fee** - Direct platform revenue
+
+2. **Trigger Conditions**: Buybacks activate when:
+   - Current market price falls below backing value thresholds
+   - Treasury pool has sufficient funds
+   - Price drops significantly from the EMA (exponential moving average)
+
+3. **Buyback Execution**: 
+   - Platform automatically buys tokens using treasury funds
+   - Purchased tokens are **permanently burned** (destroyed)
+   - Supply reduction increases scarcity and supports price
+
+4. **Supply Reduction**: Each buyback permanently reduces the `circulating_supply`, making remaining tokens potentially more valuable.
+
+### Buyback Benefits
+
+**🛡️ Price Support**: Automatic buying pressure during downtrends  
+**🔥 Supply Reduction**: Burned tokens create permanent scarcity  
+**💰 Treasury Utilization**: Fee accumulation funds price protection  
+**⚖️ Market Stability**: Reduces extreme volatility  
+**🔄 Sustainable Mechanics**: Self-funding through trading activity  
+
+{% hint style="warning" %}
+**Burn Limits**: The system has built-in limits to prevent excessive burning (typically max 25% of total supply) to maintain healthy tokenomics.
+{% endhint %}
+
+## Early Bird Reward System
+
+The **Early Bird mechanism** rewards the first supporters of new tokens:
+
+### How Early Bird Works
+
+1. **Entry Qualification**: First 20 buyers (configurable) who meet minimum purchase requirements become Early Birds
+2. **Anti-Sybil Protection**: Minimum SOL purchase amount prevents gaming with multiple small wallets  
+3. **Position Tracking**: Each buyer gets a permanent position number (1st, 2nd, 3rd, etc.)
+4. **Permanent Status**: Early Bird status lasts as long as you hold tokens
+
+### Early Bird Benefits
+
+- **Fee Sharing**: Earn from **every trade** that happens on the token
+- **Equal Distribution**: All Early Birds get exactly the same reward amount
+- **Passive Income**: Rewards accumulate automatically from trading activity
+- **Graduation Bonus**: Large reward distribution when token graduates to DEX
+
+### Status Loss
+
+**⚠️ Warning**: Selling **any amount** of tokens permanently revokes Early Bird status. There's no way to regain it, even if you buy back in.
+
+### Claiming Rewards
+
+- Early Bird rewards can only be claimed **after graduation** (when curve completes)
+- Rewards are calculated as: `early_bird_pool ÷ valid_early_bird_count`
+- Each Early Bird gets exactly the same amount regardless of purchase size or timing
+
+## Fee Distribution System
 
 ### Understanding Price Impact
 
