@@ -2,6 +2,10 @@
 
 Creating your own token on Yoink is fast, simple, and powerful. Launch your creator coin in under 60 seconds with just a few clicks - no coding required!
 
+
+<figure><img src="../.gitbook/assets/create.png" alt=""><figcaption></figcaption></figure>
+
+
 ## Required Information
 
 ### Token Details
@@ -17,12 +21,15 @@ Choose carefully - token details cannot be changed after creation.
 
 ## Optional Features
 
-###  Social Links
+{% hint style="info" %}
+**🔗 Social Links**
 
 Add credibility with your social presence:
 - Website, Twitter/X, Telegram (all optional)
+{% endhint %}
 
-### 📺 Content Showcase
+{% hint style="info" %}
+**📺 Content Showcase**
 
 Choose **one** of these options:
 
@@ -35,6 +42,7 @@ Choose **one** of these options:
 - Upload promotional video (max 100MB)
 - Formats: MP4, WebM, AVI, MOV
 - Stored permanently on IPFS
+{% endhint %}
 
 ## Creation Steps
 
@@ -47,6 +55,10 @@ Double-check all details before creating - they're permanent!
 - Click "Create Coin" 
 - Approve wallet transaction
 - Wait 30-60 seconds for confirmation
+
+
+<figure><img src="../.gitbook/assets/done.png" alt=""><figcaption></figcaption></figure>
+
 
 ### 3. Start Trading
 
