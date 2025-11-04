@@ -1,6 +1,11 @@
-# Autobuyback
+# 🔄 Auto Buyback
 
-An intelligent system that automatically purchases and burns tokens from the treasury pool when market conditions are favorable, helping stabilize token prices and reduce circulating supply.
+Yoink features an **algorithmic buyback mechanism** for all coins created on the platform.  
+When market conditions are favorable, the system automatically purchases and burns tokens using the **treasury pool**, helping to stabilize prices and reduce circulating supply.  
+
+This mechanism supports long-term **token health and sustainability**, ensuring a more stable experience for traders.  
+**Treasury pools grow over time** through the fees accumulated from trading volume (see the [Fees](fees.md) page for details).
+
 
 ## 🎯 How Autobuyback Works
 
@@ -8,69 +13,44 @@ An intelligent system that automatically purchases and burns tokens from the tre
 
 {% hint style="info" %}
 **🔍 Market Analysis**
-- Monitors real-time token price using bonding curve data
-- Tracks price trends with Exponential Moving Average (EMA)
-- Calculates backing value based on treasury reserves
-- Identifies optimal buyback opportunities automatically
+
+- Monitors token prices on every trade using **bonding curve data**  
+- Tracks price trends through **Exponential Moving Average (EMA)**  
+- Calculates **backing value** based on treasury reserves  
+- Automatically identifies **optimal buyback opportunities**
 {% endhint %}
 
 ### Trigger Conditions
 
 {% hint style="warning" %}
 **📊 Buyback Triggers When:**
-- Current price falls below backing threshold (250% of backing value)
-- **OR** price drops below EMA threshold (90% of moving average)
-- **AND** sufficient treasury funds are available
-- **AND** total burn limit hasn't been reached (25% max supply)
+- The current price falls below the **backing threshold** (250% of backing value)  
+- **OR** the price drops below the **EMA threshold** (90% of the moving average)  
+- **AND** sufficient **treasury funds** are available  
+- **AND** the **total burn limit** hasn’t been reached (25% of max supply)
 
-**📈 Safety Guards:**
-- Maximum 40% of circulating supply per buyback
-- Minimum backing value required to prevent dust triggers
-- Emergency stop when 50% price drop occurs
 {% endhint %}
 
-## ⚙️ Technical Implementation
 
+
+## ⚙️ Technical Implementation
 ### Dynamic Parameters
 
 | Parameter | Value | Purpose |
 |-----------|--------|---------|
-| **Backing Multiplier** | 250% (25000 bps) | Price threshold above backing value |
-| **EMA Drop Threshold** | 90% (9000 bps) | Moving average trigger level |
-| **EMA Response Speed** | 50% (5000 bps) | Price trend calculation weight |
-| **Treasury Spend** | 60% (6000 bps) | Portion of treasury used per buyback |
-| **Supply Cap** | 40% (4000 bps) | Maximum tokens bought per transaction |
-| **Max Burn Total** | 25% (2500 bps) | Lifetime burn limit of total supply |
+| **Backing Multiplier** | 250% (25,000 bps) | Price threshold above backing value |
+| **EMA Drop Threshold** | 90% (9,000 bps) | Trigger level for moving average deviation |
+| **EMA Response Speed** | 50% (5,000 bps) | Weight factor in price trend calculation |
+| **Treasury Spend** | 60% (6,000 bps) | Portion of treasury used per buyback |
+| **Max Burn Total** | 25% (2,500 bps) | Lifetime burn limit relative to total supply |
 
 {% hint style="info" %}
-**💡 Parameter Balance:** These settings create sustainable long-term tokenomics by combining conservative trigger thresholds (250% backing, 90% EMA) with aggressive response actions (60% treasury spend, 40% supply cap). The high backing multiplier prevents frequent triggering during normal volatility, while substantial spending ensures meaningful impact when conditions warrant intervention. The 25% lifetime burn limit protects against excessive deflation while allowing significant supply reduction over time.
+**💡 Parameter Balance:**  
+These parameters are designed to maintain **long-term sustainability** by blending conservative trigger thresholds (250% backing, 90% EMA) with decisive response actions (60% treasury spend, 40% supply cap).  
+The elevated backing multiplier minimizes unnecessary activations during normal volatility, while the treasury’s significant allocation ensures **meaningful buyback impact** when market conditions warrant.  
+Finally, the **25% lifetime burn cap** prevents over-deflation while still allowing a healthy reduction in circulating supply over time.
 {% endhint %}
 
-### Process Flow
-
-{% hint style="success" %}
-**1️⃣ Price Analysis**
-- Calculate current market price for 1 token lot
-- Update EMA with latest price data
-- Determine backing value from treasury + reserves
-
-**2️⃣ Trigger Check**
-- Compare market price to trigger thresholds
-- Verify treasury has sufficient funds
-- Check total burn limit hasn't been exceeded
-
-**3️⃣ Buyback Execution**
-- Calculate optimal purchase amount from treasury budget
-- Execute buy order through bonding curve mechanics
-- **Immediately burn all purchased tokens**
-- Update circulating supply and burn totals
-
-**4️⃣ State Updates**
-- Reduce virtual and real token reserves
-- Increase SOL reserves with purchase amount
-- Deduct cost from treasury pool
-- Log complete transaction details
-{% endhint %}
 
 ## � Benefits for Token Holders
 
@@ -91,47 +71,38 @@ An intelligent system that automatically purchases and burns tokens from the tre
 
 ## 📊 Monitoring & Transparency
 
-### Real-Time Tracking
+### Buyback Activity Tab
 
 {% hint style="info" %}
-**📈 Available Metrics:**
-- Total tokens burned through buybacks
-- Treasury funds spent on buybacks
-- Buyback frequency and timing
-- Price impact of each buyback
-- Remaining burn capacity (25% limit)
+**📈 Track Buybacks on Token Pages:**
+- Each coin page includes a dedicated **"Buybacks" tab**
+- View complete history of all buyback events
+- See exact timing, amounts, and transaction links
+- Monitor treasury utilization and burn statistics
 
-**🔍 Transaction Logs:**
-- Every buyback emits detailed event data
-- Complete before/after state comparison
-- Price calculations and trigger reasons
-- Burn amounts and supply updates
+**🔗 Transaction Visibility:**
+- **Burn transactions** are fully visible on Solana blockchain
+- **Buy operations** happen internally within the program
+- Only the burn will show as an external transaction
+- The "purchase" is actually an internal ledger update
 {% endhint %}
 
-### Public Verification
-- All buyback transactions are **on-chain and verifiable**
-- **Real-time price data** available through bonding curve
-- **Treasury balance** publicly auditable
-- **Burn statistics** tracked permanently
+### Internal Mechanics Explained
 
-## 🛡️ Safety Features
+{% hint style="warning" %}
+**🔄 How the "Buy" Works Internally:**
+- SOL moves from treasury vault to bonding curve liquidity pool
+- Token quotation changes to reflect increased SOL reserves
+- **No actual SOL leaves the bonding curve** - it's an internal transfer
+- This creates tokens for burning without external market impact
+- Result: Treasury balance decreases, curve liquidity increases, tokens get burned
 
-### Burn Limits
-- **Maximum 25% of total supply** can ever be burned
-- **Per-transaction limit** of 10% circulating supply
-- **Automatic shutdown** when limit reached
-
-### Price Protection
-- **Significant drop protection** (50% threshold)
-- **Minimum backing requirements** prevent manipulation
-- **EMA smoothing** reduces noise and false triggers
-
-### Treasury Management
-- **Aggressive spending** (60% per trigger maximum)
-- **Multiple fallback mechanisms** if primary calculation fails
-- **Dust protection** prevents tiny, inefficient buybacks
-
----
+**💡 Why You Only See Burns:**
+- The purchase is an internal AMM ledger adjustment
+- No external buy/sell pressure on the market
+- Only the final burn transaction appears on-chain
+- This maintains price stability during buyback operations
+{% endhint %}
 
 **🔥 Autobuyback is enabled by default** for all tokens and operates automatically without any user intervention required.
 
