@@ -15,7 +15,6 @@
 * [📺 How to Attach a Stream](yoink/how-to-attach-a-stream.md)
 * [👤 Streamer Profiles](yoink/streamer-profiles.md)
 * [✅ Streamer Verification](yoink/streamer-verification.md)
-* [👥 User Profiles](yoink/user-profiles.md)
 
 ## ✨ Features
 
