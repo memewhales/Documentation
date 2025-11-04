@@ -1,46 +1,57 @@
 # 📦 SDK Overview
 
-The Yoink SDK provides developers with a powerful toolkit to integrate Yoink's creator token functionality into their own applications. Build on top of Solana's blockchain to create, trade, and manage creator tokens programmatically.
+The Yoink SDK is the official TypeScript SDK for interacting with the Yoink bonding curve protocol on Solana. It provides developers with a comprehensive toolkit to buy, sell, and query tokens on custom bonding curves with built-in slippage protection.
 
 ## What is the Yoink SDK?
 
-The Yoink SDK is a comprehensive JavaScript/TypeScript library that allows developers to:
+The Yoink SDK is a production-ready JavaScript/TypeScript library that allows developers to:
 
-- **Create Creator Tokens**: Launch new creator tokens with custom metadata
-- **Trade Tokens**: Buy and sell creator tokens programmatically
-- **Stream Integration**: Connect live streams to token launches
-- **Profile Management**: Manage user and creator profiles
-- **Analytics**: Access trading data and analytics
+- **🔄 Buy & Sell Tokens**: Execute trades on custom bonding curves
+- **💰 Price Quotes**: Get accurate quotes before trading
+- **📊 Market Data**: Query bonding curve state and statistics
+- **🛡️ Slippage Protection**: Built-in safeguards against price volatility
+- **⚡ Priority Fees**: Support for transaction prioritization
 
 ## Key Features
 
 ### 🚀 Easy Integration
-- Simple npm package installation
-- TypeScript support with full type definitions
-- Comprehensive documentation and examples
+- Simple npm package installation: `npm install yoink-sdk`
+- Full TypeScript support with detailed types
+- Multi-platform support (Node.js and browser)
 
 ### 🔗 Blockchain Integration
-- Built on Solana for fast, low-cost transactions
-- Seamless wallet integration
-- Support for multiple wallet providers
+- Built on Solana using Anchor framework
+- Program ID: `HbiDw6U515iWwHQ4edjmceT24ST7akg7z5rhXRhBac4J`
+- Supports both testnet (Eclipse) and mainnet
 
-### 📊 Real-time Data
-- Live price feeds
-- Trading activity monitoring
-- Stream status updates
+### 📊 Real-time Market Data
+- Live bonding curve state tracking
+- Market cap calculations in real-time
+- Price per token with decimal precision
+- Virtual and real reserve monitoring
 
-### 🛡️ Security First
-- Secure transaction signing
-- Built-in error handling
-- Rate limiting protection
+### 🛡️ Security & Reliability
+- Built-in slippage protection
+- Comprehensive error handling
+- Transaction success/failure tracking
+- Type-safe API methods
+
+## Architecture
+
+The Yoink protocol uses a bonding curve mechanism where:
+
+- **Virtual Reserves**: Used for price calculations
+- **Real Reserves**: Actual tokens and SOL in the curve
+- **Fee Structure**: Configurable basis points (e.g., 400 = 4%)
+- **Complete State**: Tracks when bonding curves are finalized
 
 ## Use Cases
 
-- **Trading Bots**: Automate token trading strategies
-- **Analytics Dashboards**: Build custom analytics interfaces
-- **Portfolio Management**: Track and manage token investments
-- **Creator Tools**: Develop tools for content creators
-- **Integration Apps**: Connect Yoink with other platforms
+- **Trading Applications**: Build custom trading interfaces
+- **Price Monitoring**: Track token prices and market caps
+- **Portfolio Tools**: Monitor holdings and performance
+- **Analytics Dashboards**: Display market statistics
+- **Trading Bots**: Automate trading strategies with slippage protection
 
 ## Getting Started
 

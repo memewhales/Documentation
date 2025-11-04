@@ -1,35 +1,65 @@
 # 📝 Example Script 2: Portfolio Analytics Dashboard
 
-This example demonstrates how to build a comprehensive portfolio analytics dashboard that tracks your token holdings, performance, and provides insights.
+This example demonstrates how to build a comprehensive portfolio analytics dashboard that tracks your bonding curve token holdings, performance, and provides real-time insights using the Yoink SDK.
 
 ## Overview
 
 This script will:
-- Track all token holdings in real-time
-- Calculate portfolio performance and P&L
-- Generate analytics reports
-- Send alerts for significant changes
-- Export data for further analysis
+- Track all bonding curve token holdings in real-time
+- Calculate portfolio performance and P&L based on actual market data
+- Monitor market cap changes and buyer activity
+- Generate analytics reports with bonding curve statistics
+- Send alerts for significant price movements
 
 ## Prerequisites
 
-- Yoink SDK installed
-- Wallet address to track
-- Basic understanding of portfolio management
+- Yoink SDK installed: `npm install yoink-sdk`
+- Funded Solana wallet to track
+- Basic understanding of bonding curves and portfolio management
 
 ## Script Code
 
-```javascript
-import { YoinkSDK } from 'yoink-sdk';
+```typescript
+import { YoinkSDK } from "yoink-sdk";
+import { Connection, Keypair, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
+import { AnchorProvider } from "@coral-xyz/anchor";
+import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
+import { getAccount, getAssociatedTokenAddress } from "@solana/spl-token";
 import fs from 'fs';
 import path from 'path';
 
+interface TokenHolding {
+  mint: string;
+  balance: number;
+  currentPrice: number;
+  marketCap: number;
+  totalBuyers: number;
+  isComplete: boolean;
+  value: number;
+  change24h?: number;
+}
+
+interface PortfolioSnapshot {
+  timestamp: number;
+  totalValue: number;
+  holdings: TokenHolding[];
+  topPerformer: string;
+  bottomPerformer: string;
+}
+
 class PortfolioAnalytics {
-  constructor(config) {
-    this.yoink = new YoinkSDK({
-      network: config.network || 'mainnet-beta',
-      wallet: config.wallet,
-    });
+  private sdk: YoinkSDK;
+  private config: any;
+  private previousSnapshot?: PortfolioSnapshot;
+  private isRunning: boolean = false;
+
+  constructor(config: any) {
+    // Initialize connection and provider
+    const connection = new Connection(config.rpcUrl || "https://staging-rpc.dev2.eclipsenetwork.xyz");
+    const wallet = new NodeWallet(config.keypair || Keypair.generate());
+    const provider = new AnchorProvider(connection, wallet, { commitment: "confirmed" });
+    
+    this.sdk = new YoinkSDK(provider);
     
     this.config = {
       walletAddress: config.walletAddress,
@@ -37,34 +67,22 @@ class PortfolioAnalytics {
       alertThresholds: {
         gainPercent: config.alertThresholds?.gainPercent || 20,
         lossPercent: config.alertThresholds?.lossPercent || -10,
-        volumeChange: config.alertThresholds?.volumeChange || 50,
+        marketCapChange: config.alertThresholds?.marketCapChange || 50,
       },
-      exportPath: config.exportPath || './portfolio-data',
+      exportPath: config.exportPath || './portfolio_data.json',
+      tokenMints: config.tokenMints || [], // Specific tokens to track
     };
-    
-    this.portfolio = {
-      tokens: new Map(),
-      totalValue: 0,
-      totalCost: 0,
-      performance: {
-        totalGainLoss: 0,
-        totalGainLossPercent: 0,
-        best24h: null,
-        worst24h: null,
-      },
-      history: [],
-    };
-    
-    this.isRunning = false;
-    this.lastUpdate = null;
   }
 
   async start() {
     console.log('📊 Starting Portfolio Analytics Dashboard...');
     
     try {
-      await this.yoink.connect();
-      console.log('✅ Connected, tracking wallet:', this.config.walletAddress);
+      // Test connection to Yoink protocol
+      const global = await this.sdk.getGlobalAccount();
+      console.log('✅ Connected to Yoink protocol');
+      console.log('Protocol fee:', Number(global.feeBasisPoints) / 100, '%');
+      console.log('📈 Tracking wallet:', this.config.walletAddress);
       
       // Initial portfolio load
       await this.updatePortfolio();
@@ -73,7 +91,7 @@ class PortfolioAnalytics {
       this.startMonitoring();
       
     } catch (error) {
-      console.error('❌ Failed to start analytics:', error.message);
+      console.error('❌ Failed to start analytics:', error);
     }
   }
 
@@ -96,229 +114,321 @@ class PortfolioAnalytics {
     try {
       console.log('🔄 Updating portfolio data...');
       
-      // Get user profile and holdings
-      const profile = await this.yoink.getUserProfile(this.config.walletAddress);
-      const holdings = profile.tokensOwned || [];
-      
+      const holdings: TokenHolding[] = [];
       let totalValue = 0;
-      let totalCost = 0;
       
-      for (const holding of holdings) {
-        const token = await this.yoink.getToken(holding.tokenAddress);
-        const currentValue = holding.amount * token.price;
-        
-        // Get or create token entry
-        let tokenData = this.portfolio.tokens.get(holding.tokenAddress) || {
-          symbol: token.symbol,
-          name: token.name,
-          amount: holding.amount,
-          costBasis: holding.costBasis || 0,
-          firstPurchase: holding.firstPurchase || new Date(),
-          priceHistory: [],
-        };
-        
-        // Update token data
-        tokenData.currentPrice = token.price;
-        tokenData.currentValue = currentValue;
-        tokenData.gainLoss = currentValue - tokenData.costBasis;
-        tokenData.gainLossPercent = tokenData.costBasis > 0 
-          ? (tokenData.gainLoss / tokenData.costBasis) * 100 
-          : 0;
-        tokenData.change24h = token.priceChange24h || 0;
-        tokenData.volume24h = token.volume24h || 0;
-        
-        // Add to price history
-        tokenData.priceHistory.push({
-          timestamp: new Date(),
-          price: token.price,
-          volume: token.volume24h,
-        });
-        
-        // Keep only last 100 price points
-        if (tokenData.priceHistory.length > 100) {
-          tokenData.priceHistory.shift();
+      // Check holdings for each configured token mint
+      for (const mintStr of this.config.tokenMints) {
+        try {
+          const mint = new PublicKey(mintStr);
+          const balance = await this.getTokenBalance(mint, new PublicKey(this.config.walletAddress));
+          
+          if (balance > 0) {
+            // Get bonding curve data
+            const curve = await this.sdk.getBondingCurveAccount(mint);
+            if (curve) {
+              const currentPrice = curve.getPricePerToken();
+              const marketCap = Number(curve.getMarketCapSOL()) / LAMPORTS_PER_SOL;
+              const value = balance * currentPrice;
+              
+              const holding: TokenHolding = {
+                mint: mintStr,
+                balance,
+                currentPrice,
+                marketCap,
+                totalBuyers: Number(curve.totalBuyers),
+                isComplete: curve.complete,
+                value,
+              };
+              
+              holdings.push(holding);
+              totalValue += value;
+              
+              console.log(`🪙 ${mintStr.slice(0, 8)}...: ${balance.toFixed(2)} tokens (${value.toFixed(6)} SOL)`);
+            }
+          }
+        } catch (error) {
+          console.error(`❌ Error checking ${mintStr}:`, error);
         }
-        
-        this.portfolio.tokens.set(holding.tokenAddress, tokenData);
-        
-        totalValue += currentValue;
-        totalCost += tokenData.costBasis;
       }
       
-      // Update portfolio totals
-      this.portfolio.totalValue = totalValue;
-      this.portfolio.totalCost = totalCost;
-      this.portfolio.performance.totalGainLoss = totalValue - totalCost;
-      this.portfolio.performance.totalGainLossPercent = totalCost > 0 
-        ? (this.portfolio.performance.totalGainLoss / totalCost) * 100 
-        : 0;
-      
-      // Find best and worst performers
-      this.findTopPerformers();
-      
-      // Add to history
-      this.portfolio.history.push({
-        timestamp: new Date(),
+      // Create portfolio snapshot
+      const snapshot: PortfolioSnapshot = {
+        timestamp: Date.now(),
         totalValue,
-        totalCost,
-        gainLoss: this.portfolio.performance.totalGainLoss,
-        gainLossPercent: this.portfolio.performance.totalGainLossPercent,
-      });
+        holdings,
+        topPerformer: this.findTopPerformer(holdings),
+        bottomPerformer: this.findBottomPerformer(holdings),
+      };
       
-      // Keep only last 1000 history points
-      if (this.portfolio.history.length > 1000) {
-        this.portfolio.history.shift();
+      // Calculate changes from previous snapshot
+      if (this.previousSnapshot) {
+        this.calculateChanges(snapshot, this.previousSnapshot);
+        this.checkAlerts(snapshot, this.previousSnapshot);
       }
       
-      this.lastUpdate = new Date();
+      
+      console.log(`💼 Total Portfolio Value: ${totalValue.toFixed(6)} SOL`);
+      console.log('─'.repeat(50));
       
     } catch (error) {
-      console.error('❌ Error updating portfolio:', error.message);
+      console.error('❌ Error updating portfolio:', error);
     }
   }
 
-  findTopPerformers() {
-    const tokens = Array.from(this.portfolio.tokens.values());
-    
-    // Best 24h performer
-    this.portfolio.performance.best24h = tokens.reduce((best, token) => {
-      return (!best || token.change24h > best.change24h) ? token : best;
-    }, null);
-    
-    // Worst 24h performer
-    this.portfolio.performance.worst24h = tokens.reduce((worst, token) => {
-      return (!worst || token.change24h < worst.change24h) ? token : worst;
-    }, null);
+  async getTokenBalance(mint: PublicKey, owner: PublicKey): Promise<number> {
+    try {
+      const ata = await getAssociatedTokenAddress(mint, owner);
+      const account = await getAccount(this.sdk.connection, ata);
+      return Number(account.amount) / Math.pow(10, 6); // Assuming 6 decimals
+    } catch (error) {
+      return 0; // No token account or zero balance
+    }
   }
 
-  async generateReport() {
+  findTopPerformer(holdings: TokenHolding[]): string {
+    if (holdings.length === 0) return 'None';
+    const top = holdings.reduce((prev, current) => 
+      (current.value > prev.value) ? current : prev
+    );
+    return `${top.mint.slice(0, 8)}... (${top.value.toFixed(6)} SOL)`;
+  }
+
+  findBottomPerformer(holdings: TokenHolding[]): string {
+    if (holdings.length === 0) return 'None';
+    const bottom = holdings.reduce((prev, current) => 
+      (current.value < prev.value) ? current : prev
+    );
+    return `${bottom.mint.slice(0, 8)}... (${bottom.value.toFixed(6)} SOL)`;
+  }
+
+  calculateChanges(current: PortfolioSnapshot, previous: PortfolioSnapshot) {
+    const valueChange = current.totalValue - previous.totalValue;
+    const percentChange = previous.totalValue > 0 ? 
+      (valueChange / previous.totalValue) * 100 : 0;
+    
+    console.log(`📈 Portfolio Change: ${valueChange > 0 ? '+' : ''}${valueChange.toFixed(6)} SOL (${percentChange.toFixed(2)}%)`);
+    
+    // Add 24h change to holdings
+    current.holdings.forEach(holding => {
+      const prevHolding = previous.holdings.find(h => h.mint === holding.mint);
+      if (prevHolding) {
+        const priceChange = ((holding.currentPrice - prevHolding.currentPrice) / prevHolding.currentPrice) * 100;
+        holding.change24h = priceChange;
+      }
+    });
+  }
+
+    // Check for significant portfolio changes
+    const valueChange = current.totalValue - previous.totalValue;
+    const percentChange = previous.totalValue > 0 ? 
+      (valueChange / previous.totalValue) * 100 : 0;
+    
+    if (Math.abs(percentChange) >= this.config.alertThresholds.gainPercent) {
+      console.log(`🚨 ALERT: Portfolio ${percentChange > 0 ? 'gained' : 'lost'} ${Math.abs(percentChange).toFixed(2)}%`);
+    }
+    
+    // Check individual token alerts
+    current.holdings.forEach(holding => {
+      const prevHolding = previous.holdings.find(h => h.mint === holding.mint);
+      if (prevHolding) {
+        const marketCapChange = ((holding.marketCap - prevHolding.marketCap) / prevHolding.marketCap) * 100;
+        
+        if (Math.abs(marketCapChange) >= this.config.alertThresholds.marketCapChange) {
+          console.log(`🚨 ALERT: ${holding.mint.slice(0, 8)}... market cap ${marketCapChange > 0 ? 'increased' : 'decreased'} by ${Math.abs(marketCapChange).toFixed(2)}%`);
+        }
+      }
+    });
+  }
+
+  displayPortfolio(snapshot: PortfolioSnapshot) {
     console.clear();
     console.log('🚀 YOINK PORTFOLIO ANALYTICS DASHBOARD');
     console.log('=====================================');
-    console.log(`Last Update: ${this.lastUpdate?.toLocaleString() || 'Never'}`);
+    console.log(`Last Update: ${new Date(snapshot.timestamp).toLocaleString()}`);
     console.log();
     
     // Portfolio Overview
     console.log('📊 PORTFOLIO OVERVIEW');
     console.log('---------------------');
-    console.log(`Total Value: ${this.portfolio.totalValue.toFixed(4)} SOL`);
-    console.log(`Total Cost: ${this.portfolio.totalCost.toFixed(4)} SOL`);
-    console.log(`Total P&L: ${this.portfolio.performance.totalGainLoss > 0 ? '+' : ''}${this.portfolio.performance.totalGainLoss.toFixed(4)} SOL`);
-    console.log(`Total P&L %: ${this.portfolio.performance.totalGainLossPercent > 0 ? '+' : ''}${this.portfolio.performance.totalGainLossPercent.toFixed(2)}%`);
+    console.log(`Total Value: ${snapshot.totalValue.toFixed(6)} SOL`);
+    console.log(`Top Performer: ${snapshot.topPerformer}`);
+    console.log(`Bottom Performer: ${snapshot.bottomPerformer}`);
     console.log();
     
     // Holdings
     console.log('💼 CURRENT HOLDINGS');
     console.log('-------------------');
-    if (this.portfolio.tokens.size === 0) {
+    if (snapshot.holdings.length === 0) {
       console.log('No tokens in portfolio');
     } else {
-      this.portfolio.tokens.forEach(token => {
-        const pnlColor = token.gainLoss >= 0 ? '🟢' : '🔴';
-        console.log(`${pnlColor} ${token.symbol}`);
-        console.log(`   Amount: ${token.amount.toFixed(2)}`);
-        console.log(`   Price: ${token.currentPrice.toFixed(6)} SOL`);
-        console.log(`   Value: ${token.currentValue.toFixed(4)} SOL`);
-        console.log(`   P&L: ${token.gainLoss > 0 ? '+' : ''}${token.gainLoss.toFixed(4)} SOL (${token.gainLossPercent > 0 ? '+' : ''}${token.gainLossPercent.toFixed(2)}%)`);
-        console.log(`   24h: ${token.change24h > 0 ? '+' : ''}${token.change24h.toFixed(2)}%`);
+      snapshot.holdings.forEach(holding => {
+        const changeColor = (holding.change24h || 0) >= 0 ? '🟢' : '🔴';
+        const changeStr = holding.change24h ? `(${holding.change24h > 0 ? '+' : ''}${holding.change24h.toFixed(2)}%)` : '';
+        
+        console.log(`${changeColor} ${holding.mint.slice(0, 8)}...`);
+        console.log(`   Balance: ${holding.balance.toFixed(2)} tokens`);
+        console.log(`   Value: ${holding.value.toFixed(6)} SOL ${changeStr}`);
+        console.log(`   Price: ${holding.currentPrice.toFixed(8)} SOL/token`);
+        console.log(`   Market Cap: ${holding.marketCap.toFixed(4)} SOL`);
+        console.log(`   Buyers: ${holding.totalBuyers}`);
+        console.log(`   Complete: ${holding.isComplete ? 'Yes' : 'No'}`);
         console.log();
       });
     }
     
-    // Top Performers
-    if (this.portfolio.performance.best24h) {
-      console.log('🏆 TOP PERFORMERS (24H)');
-      console.log('-----------------------');
-      console.log(`Best: ${this.portfolio.performance.best24h.symbol} (+${this.portfolio.performance.best24h.change24h.toFixed(2)}%)`);
-      console.log(`Worst: ${this.portfolio.performance.worst24h.symbol} (${this.portfolio.performance.worst24h.change24h.toFixed(2)}%)`);
-      console.log();
-    }
-    
-    // Performance Chart (ASCII)
-    this.drawPerformanceChart();
+    console.log('─'.repeat(50));
   }
 
-  drawPerformanceChart() {
-    if (this.portfolio.history.length < 2) return;
-    
-    console.log('📈 PERFORMANCE CHART (Last 20 Updates)');
-    console.log('---------------------------------------');
-    
-    const recentHistory = this.portfolio.history.slice(-20);
-    const values = recentHistory.map(h => h.gainLossPercent);
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const range = max - min || 1;
-    
-    recentHistory.forEach((point, index) => {
-      const normalized = ((point.gainLossPercent - min) / range) * 20;
-      const bar = '█'.repeat(Math.max(1, Math.floor(normalized)));
-      const time = point.timestamp.toLocaleTimeString().slice(0, 5);
-      console.log(`${time} |${bar} ${point.gainLossPercent.toFixed(2)}%`);
-    });
-    console.log();
-  }
-
-  async checkAlerts() {
-    try {
-      this.portfolio.tokens.forEach(token => {
-        const { gainPercent, lossPercent } = this.config.alertThresholds;
-        
-        // Gain alert
-        if (token.gainLossPercent >= gainPercent) {
-          this.sendAlert(`🚀 ${token.symbol} is up ${token.gainLossPercent.toFixed(2)}%! Current value: ${token.currentValue.toFixed(4)} SOL`);
-        }
-        
-        // Loss alert
-        if (token.gainLossPercent <= lossPercent) {
-          this.sendAlert(`⚠️ ${token.symbol} is down ${Math.abs(token.gainLossPercent).toFixed(2)}%. Current value: ${token.currentValue.toFixed(4)} SOL`);
-        }
-      });
-    } catch (error) {
-      console.error('❌ Error checking alerts:', error.message);
-    }
-  }
-
-  sendAlert(message) {
-    console.log(`🔔 ALERT: ${message}`);
-    // Here you could integrate with Discord, Telegram, email, etc.
-  }
-
-  async exportData() {
+  exportData(snapshot: PortfolioSnapshot) {
     try {
       const exportData = {
-        timestamp: new Date().toISOString(),
-        portfolio: {
-          totalValue: this.portfolio.totalValue,
-          totalCost: this.portfolio.totalCost,
-          performance: this.portfolio.performance,
-        },
-        holdings: Array.from(this.portfolio.tokens.entries()).map(([address, data]) => ({
-          address,
-          ...data,
-        })),
-        history: this.portfolio.history,
+        timestamp: snapshot.timestamp,
+        totalValue: snapshot.totalValue,
+        holdings: snapshot.holdings,
+        topPerformer: snapshot.topPerformer,
+        bottomPerformer: snapshot.bottomPerformer,
       };
       
-      const filename = `portfolio-${new Date().toISOString().split('T')[0]}.json`;
-      const filepath = path.join(this.config.exportPath, filename);
-      
-      // Ensure directory exists
-      if (!fs.existsSync(this.config.exportPath)) {
-        fs.mkdirSync(this.config.exportPath, { recursive: true });
-      }
-      
-      fs.writeFileSync(filepath, JSON.stringify(exportData, null, 2));
-      console.log(`📁 Data exported to: ${filepath}`);
-      
+      fs.writeFileSync(this.config.exportPath, JSON.stringify(exportData, null, 2));
+      console.log(`📄 Data exported to ${this.config.exportPath}`);
     } catch (error) {
-      console.error('❌ Export failed:', error.message);
+      console.error('❌ Export failed:', error);
     }
+  }
+
+    console.log('� Starting continuous monitoring...');
+    setInterval(async () => {
+      await this.updatePortfolio();
+    }, this.config.updateInterval);
   }
 
   stop() {
     console.log('🛑 Stopping portfolio analytics...');
     this.isRunning = false;
+  }
+}
+
+// Usage Example
+async function main() {
+  // Replace with your actual keypair and configuration
+  const analytics = new PortfolioAnalytics({
+    walletAddress: "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU", // Your wallet address
+    keypair: Keypair.generate(), // Your keypair for API access
+    rpcUrl: "https://staging-rpc.dev2.eclipsenetwork.xyz",
+    
+    // Token mints to track
+    tokenMints: [
+      "HbiDw6U515iWwHQ4edjmceT24ST7akg7z5rhXRhBac4J",
+      // Add more token mint addresses
+    ],
+    
+    updateInterval: 30000, // Update every 30 seconds
+    exportPath: './portfolio_analytics.json',
+    
+    alertThresholds: {
+      gainPercent: 25,        // Alert on 25%+ gains
+      lossPercent: -15,       // Alert on 15%+ losses
+      marketCapChange: 100,   // Alert on 100%+ market cap changes
+    },
+  });
+  
+  await analytics.start();
+  
+  // Stop after 1 hour (for demo)
+  setTimeout(() => {
+    analytics.stop();
+  }, 3600000);
+}
+
+// Handle graceful shutdown
+process.on('SIGINT', () => {
+  console.log('\\n� Shutting down analytics...');
+  process.exit(0);
+});
+
+main().catch(console.error);
+```
+
+## Configuration Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `walletAddress` | String | Required | Wallet address to track holdings |
+| `tokenMints` | Array | `[]` | List of token mint addresses to monitor |
+| `updateInterval` | Number | `60000` | Update interval in milliseconds |
+| `exportPath` | String | `'./portfolio_data.json'` | Path for data export |
+| `alertThresholds.gainPercent` | Number | `20` | Alert threshold for gains (%) |
+| `alertThresholds.lossPercent` | Number | `-10` | Alert threshold for losses (%) |
+| `alertThresholds.marketCapChange` | Number | `50` | Market cap change alert threshold (%) |
+
+## Features
+
+- **Real-time Portfolio Tracking**: Uses actual SDK methods to fetch token balances and bonding curve data
+- **Market Data Integration**: Displays market cap, buyer count, and curve completion status
+- **Change Detection**: Tracks value changes between updates
+- **Alert System**: Configurable alerts for significant changes
+- **Data Export**: JSON export for further analysis
+- **Performance Metrics**: Portfolio value tracking and top/bottom performers
+
+## Running the Script
+
+1. **Install dependencies**:
+   ```bash
+   npm install yoink-sdk @solana/web3.js @solana/spl-token @coral-xyz/anchor
+   ```
+
+2. **Configure your settings**:
+   ```typescript
+   const analytics = new PortfolioAnalytics({
+     walletAddress: "YOUR_WALLET_ADDRESS",
+     tokenMints: ["MINT1", "MINT2"], // Token mints to track
+     updateInterval: 30000, // 30 seconds
+   });
+   ```
+
+3. **Run the script**:
+   ```bash
+   npx ts-node portfolio-analytics.ts
+   ```
+
+## Example Output
+
+```
+🚀 YOINK PORTFOLIO ANALYTICS DASHBOARD
+=====================================
+Last Update: 11/4/2025, 2:30:15 PM
+
+📊 PORTFOLIO OVERVIEW
+---------------------
+Total Value: 0.125430 SOL
+Top Performer: HbiDw6U5... (0.085230 SOL)
+Bottom Performer: 9WzDXwBb... (0.040200 SOL)
+
+💼 CURRENT HOLDINGS
+-------------------
+🟢 HbiDw6U5...
+   Balance: 150000.00 tokens
+   Value: 0.085230 SOL (+12.30%)
+   Price: 0.00000568 SOL/token
+   Market Cap: 45.2341 SOL
+   Buyers: 87
+   Complete: false
+
+🔴 9WzDXwBb...
+   Balance: 75000.00 tokens
+   Value: 0.040200 SOL (-5.20%)
+   Price: 0.00000536 SOL/token
+   Market Cap: 22.1204 SOL
+   Buyers: 34
+   Complete: false
+```
+
+## Next Steps
+
+- [🤖 Build a Trading Bot](creator-token-bot.md)
+- [📖 Read the full Usage Guide](usage.md)
+- [📝 Try Example Script 1](example-1.md)
     
     // Export final data
     this.exportData();

@@ -1,504 +1,512 @@
-# 🎥 Stream Monitor & Token Launcher
+# 🔍 Bonding Curve Monitor & Alert System
 
-This example shows how to create a comprehensive stream monitoring system that tracks live streams and can automatically launch creator tokens when certain conditions are met.
+This example shows how to create a comprehensive bonding curve monitoring system that tracks new token launches, curve progressions, and market events in real-time.
 
 ## Overview
 
 This system will:
-- Monitor live streams across platforms (Twitch, YouTube, etc.)
-- Track viewer engagement and stream metrics
-- Automatically launch creator tokens for eligible streamers
-- Send notifications for important stream events
-- Manage token metadata and initial distribution
+- Monitor new bonding curve token launches on the Yoink protocol
+- Track curve progression and completion events
+- Send alerts for significant price movements and milestones
+- Provide real-time market data and statistics
+- Generate reports on market activity and trends
 
 ## Prerequisites
 
-- Yoink SDK installed
-- Stream platform API keys (Twitch, YouTube)
-- Wallet with SOL for token creation fees
-- Understanding of creator token economics
+- Yoink SDK installed and configured
+- Solana RPC endpoint access
+- Basic understanding of bonding curve mechanics
+- Optional: Notification services (Discord, Telegram, Email)
 
 ## Script Code
 
-```javascript
-import { YoinkSDK } from 'yoink-sdk';
-import axios from 'axios';
+```typescript
+import { YoinkSDK } from '../src/yoink';
+import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 
-class StreamMonitorAndLauncher {
-  constructor(config) {
-    this.yoink = new YoinkSDK({
-      network: config.network || 'mainnet-beta',
-      wallet: config.wallet,
+interface TokenEvent {
+  type: 'launch' | 'trade' | 'completion' | 'milestone';
+  timestamp: Date;
+  mint: string;
+  data: any;
+}
+
+interface MonitoredToken {
+  mint: string;
+  symbol: string;
+  createdAt: Date;
+  initialPrice: number;
+  currentPrice: number;
+  marketCap: number;
+  totalBuyers: number;
+  isComplete: boolean;
+  curveProgress: number;
+  lastUpdate: Date;
+  priceHistory: { timestamp: number; price: number; marketCap: number }[];
+  alerts: {
+    priceChange: boolean;
+    buyerMilestones: number[];
+    completionAlert: boolean;
+  };
+}
+
+interface MonitorConfig {
+  rpcUrl?: string;
+  scanInterval?: number;
+  priceChangeThreshold?: number;
+  buyerMilestones?: number[];
+  enableCompletionAlerts?: boolean;
+  maxTokensToTrack?: number;
+  notifications?: {
+    discord?: { webhookUrl: string };
+    telegram?: { botToken: string; chatId: string };
+    console?: boolean;
+  };
+}
+
+class BondingCurveMonitor {
+  private sdk: YoinkSDK;
+  private config: MonitorConfig;
+  private monitoredTokens: Map<string, MonitoredToken> = new Map();
+  private eventHistory: TokenEvent[] = [];
+  private isRunning: boolean = false;
+  private lastScanTime: Date | null = null;
+
+  constructor(config: MonitorConfig = {}) {
+    const connection = new Connection(config.rpcUrl || 'https://eclipse.lgns.net');
+    const wallet = new Wallet(); // Use your actual wallet
+    const provider = new AnchorProvider(connection, wallet, {
+      commitment: 'confirmed',
+      preflightCommitment: 'confirmed',
     });
-    
+
+    this.sdk = new YoinkSDK(provider);
     this.config = {
-      // Stream Monitoring
-      twitchClientId: config.twitchClientId,
-      twitchClientSecret: config.twitchClientSecret,
-      youtubeApiKey: config.youtubeApiKey,
-      
-      // Auto-Launch Criteria
-      minViewersForLaunch: config.minViewersForLaunch || 100,
-      minFollowersForLaunch: config.minFollowersForLaunch || 1000,
-      requireVerification: config.requireVerification || true,
-      
-      // Token Parameters
-      initialSupply: config.initialSupply || 1000000,
-      initialPrice: config.initialPrice || 0.001, // SOL
-      creatorShare: config.creatorShare || 10, // 10% to creator
-      
-      // Monitoring Settings
-      checkInterval: config.checkInterval || 30000, // 30 seconds
-      platforms: config.platforms || ['twitch', 'youtube'],
+      scanInterval: 30000, // 30 seconds
+      priceChangeThreshold: 15, // 15% price change
+      buyerMilestones: [10, 25, 50, 100, 250, 500, 1000],
+      enableCompletionAlerts: true,
+      maxTokensToTrack: 100,
+      notifications: {
+        console: true,
+      },
+      ...config,
     };
-    
-    this.activeStreams = new Map();
-    this.launchedTokens = new Map();
-    this.streamHistory = [];
-    this.isRunning = false;
-    
-    // Platform API instances
-    this.twitchToken = null;
-    this.apis = {};
   }
 
   async start() {
-    console.log('🎥 Starting Stream Monitor & Token Launcher...');
+    console.log('🔍 Starting Bonding Curve Monitor...');
     
     try {
-      await this.yoink.connect();
-      await this.initializePlatformAPIs();
+      console.log('✅ Connected to Eclipse network');
       
-      console.log('✅ Connected and APIs initialized');
+      // Initial scan for existing tokens
+      await this.performInitialScan();
       
       this.isRunning = true;
       this.startMonitoring();
       
     } catch (error) {
-      console.error('❌ Failed to start stream monitor:', error.message);
+      console.error('❌ Failed to start monitor:', error);
     }
   }
 
-  async initializePlatformAPIs() {
-    // Initialize Twitch API
-    if (this.config.platforms.includes('twitch')) {
-      await this.initializeTwitchAPI();
-    }
+  async performInitialScan() {
+    console.log('📊 Performing initial scan for existing tokens...');
     
-    // Initialize YouTube API
-    if (this.config.platforms.includes('youtube')) {
-      this.apis.youtube = {
-        key: this.config.youtubeApiKey,
-        baseURL: 'https://www.googleapis.com/youtube/v3',
-      };
+    // In a real implementation, you would scan for all existing bonding curve tokens
+    // For this example, we'll use known tokens
+    const knownTokens = [
+      'HbiDw6U515iWwHQ4edjmceT24ST7akg7z5rhXRhBac4J',
+      // Add more known token mints here
+    ];
+
+    for (const mintStr of knownTokens) {
+      try {
+        await this.addTokenToMonitoring(new PublicKey(mintStr));
+      } catch (error) {
+        console.error(`Error scanning token ${mintStr}:`, error);
+      }
     }
+
+    console.log(`✅ Initial scan complete. Monitoring ${this.monitoredTokens.size} tokens`);
   }
 
-  async initializeTwitchAPI() {
+  async addTokenToMonitoring(mint: PublicKey): Promise<boolean> {
     try {
-      const response = await axios.post('https://id.twitch.tv/oauth2/token', {
-        client_id: this.config.twitchClientId,
-        client_secret: this.config.twitchClientSecret,
-        grant_type: 'client_credentials',
-      });
-      
-      this.twitchToken = response.data.access_token;
-      this.apis.twitch = {
-        token: this.twitchToken,
-        baseURL: 'https://api.twitch.tv/helix',
-        headers: {
-          'Client-ID': this.config.twitchClientId,
-          'Authorization': `Bearer ${this.twitchToken}`,
+      const curve = await this.sdk.getBondingCurveAccount(mint);
+      if (!curve) return false;
+
+      const mintStr = mint.toBase58();
+      if (this.monitoredTokens.has(mintStr)) return true;
+
+      const currentPrice = curve.getPricePerToken();
+      const marketCap = Number(curve.getMarketCapSOL()) / LAMPORTS_PER_SOL;
+      const totalBuyers = Number(curve.totalBuyers);
+      const isComplete = curve.complete;
+
+      const token: MonitoredToken = {
+        mint: mintStr,
+        symbol: `TOKEN_${mintStr.slice(0, 8)}`,
+        createdAt: new Date(), // In real implementation, get from creation event
+        initialPrice: currentPrice, // Estimate initial price
+        currentPrice,
+        marketCap,
+        totalBuyers,
+        isComplete,
+        curveProgress: this.calculateCurveProgress(curve),
+        lastUpdate: new Date(),
+        priceHistory: [{
+          timestamp: Date.now(),
+          price: currentPrice,
+          marketCap,
+        }],
+        alerts: {
+          priceChange: false,
+          buyerMilestones: [],
+          completionAlert: false,
         },
       };
-      
-      console.log('✅ Twitch API initialized');
+
+      this.monitoredTokens.set(mintStr, token);
+
+      // Log new token discovery
+      this.logEvent({
+        type: 'launch',
+        timestamp: new Date(),
+        mint: mintStr,
+        data: { currentPrice, marketCap, totalBuyers },
+      });
+
+      return true;
+
     } catch (error) {
-      console.error('❌ Failed to initialize Twitch API:', error.message);
+      console.error(`Error adding token ${mint.toBase58()} to monitoring:`, error);
+      return false;
     }
+  }
+
+  calculateCurveProgress(curve: any): number {
+    if (curve.complete) return 100;
+    
+    const currentMarketCap = Number(curve.getMarketCapSOL()) / LAMPORTS_PER_SOL;
+    const completionMarketCap = 85; // Assuming curves complete around 85 SOL
+    
+    return Math.min(100, (currentMarketCap / completionMarketCap) * 100);
   }
 
   async startMonitoring() {
+    console.log('🔄 Starting continuous monitoring...');
+
     while (this.isRunning) {
       try {
-        await this.checkActiveStreams();
-        await this.evaluateTokenLaunches();
-        await this.updateStreamMetrics();
+        await this.scanForUpdates();
+        await this.scanForNewTokens();
+        this.displayStatus();
         
-        await this.sleep(this.config.checkInterval);
+        await this.sleep(this.config.scanInterval!);
       } catch (error) {
-        console.error('❌ Monitoring error:', error.message);
+        console.error('❌ Monitoring error:', error);
         await this.sleep(5000);
       }
     }
   }
 
-  async checkActiveStreams() {
-    // Check Twitch streams
-    if (this.config.platforms.includes('twitch')) {
-      await this.checkTwitchStreams();
-    }
-    
-    // Check YouTube streams
-    if (this.config.platforms.includes('youtube')) {
-      await this.checkYouTubeStreams();
-    }
-  }
-
-  async checkTwitchStreams() {
-    try {
-      const response = await axios.get(`${this.apis.twitch.baseURL}/streams`, {
-        headers: this.apis.twitch.headers,
-        params: {
-          first: 100,
-          game_id: '', // Can filter by specific games
-        },
-      });
-      
-      for (const stream of response.data.data) {
-        await this.processStream({
-          platform: 'twitch',
-          streamerId: stream.user_id,
-          streamerName: stream.user_name,
-          title: stream.title,
-          game: stream.game_name,
-          viewers: stream.viewer_count,
-          isLive: true,
-          startedAt: new Date(stream.started_at),
-          thumbnailUrl: stream.thumbnail_url,
-        });
-      }
-      
-    } catch (error) {
-      console.error('❌ Error checking Twitch streams:', error.message);
-    }
-  }
-
-  async checkYouTubeStreams() {
-    try {
-      // YouTube Live Stream API call
-      const response = await axios.get(`${this.apis.youtube.baseURL}/search`, {
-        params: {
-          part: 'snippet',
-          eventType: 'live',
-          type: 'video',
-          maxResults: 50,
-          key: this.apis.youtube.key,
-        },
-      });
-      
-      for (const video of response.data.items) {
-        // Get additional stream details
-        const streamDetails = await this.getYouTubeStreamDetails(video.id.videoId);
+  async scanForUpdates() {
+    for (const [mintStr, token] of this.monitoredTokens.entries()) {
+      try {
+        const mint = new PublicKey(mintStr);
+        const curve = await this.sdk.getBondingCurveAccount(mint);
         
-        await this.processStream({
-          platform: 'youtube',
-          streamerId: video.snippet.channelId,
-          streamerName: video.snippet.channelTitle,
-          title: video.snippet.title,
-          viewers: streamDetails.viewers,
-          isLive: true,
-          startedAt: new Date(video.snippet.publishedAt),
-          thumbnailUrl: video.snippet.thumbnails.medium.url,
+        if (!curve) continue;
+
+        const newPrice = curve.getPricePerToken();
+        const newMarketCap = Number(curve.getMarketCapSOL()) / LAMPORTS_PER_SOL;
+        const newBuyers = Number(curve.totalBuyers);
+        const newIsComplete = curve.complete;
+        const newProgress = this.calculateCurveProgress(curve);
+
+        // Check for significant changes
+        await this.checkForAlerts(token, {
+          price: newPrice,
+          marketCap: newMarketCap,
+          buyers: newBuyers,
+          isComplete: newIsComplete,
+          progress: newProgress,
         });
+
+        // Update token data
+        token.currentPrice = newPrice;
+        token.marketCap = newMarketCap;
+        token.totalBuyers = newBuyers;
+        token.isComplete = newIsComplete;
+        token.curveProgress = newProgress;
+        token.lastUpdate = new Date();
+
+        // Add to price history
+        token.priceHistory.push({
+          timestamp: Date.now(),
+          price: newPrice,
+          marketCap: newMarketCap,
+        });
+
+        // Keep only last 100 price points
+        if (token.priceHistory.length > 100) {
+          token.priceHistory.shift();
+        }
+
+      } catch (error) {
+        console.error(`Error updating token ${mintStr}:`, error);
       }
-      
-    } catch (error) {
-      console.error('❌ Error checking YouTube streams:', error.message);
     }
+
+    this.lastScanTime = new Date();
   }
 
-  async getYouTubeStreamDetails(videoId) {
-    try {
-      const response = await axios.get(`${this.apis.youtube.baseURL}/videos`, {
-        params: {
-          part: 'liveStreamingDetails,statistics',
-          id: videoId,
-          key: this.apis.youtube.key,
-        },
-      });
-      
-      const video = response.data.items[0];
-      return {
-        viewers: parseInt(video.liveStreamingDetails?.concurrentViewers || 0),
-        startTime: video.liveStreamingDetails?.actualStartTime,
-      };
-    } catch (error) {
-      return { viewers: 0 };
-    }
-  }
+  async checkForAlerts(token: MonitoredToken, newData: any) {
+    // Price change alert
+    const priceChange = ((newData.price - token.currentPrice) / token.currentPrice) * 100;
+    if (Math.abs(priceChange) >= this.config.priceChangeThreshold!) {
+      await this.sendAlert(`📈 ${token.symbol} price ${priceChange > 0 ? 'surged' : 'dropped'} by ${Math.abs(priceChange).toFixed(2)}%! 
+        New price: ${newData.price.toFixed(8)} SOL
+        Market cap: ${newData.marketCap.toFixed(2)} SOL`);
 
-  async processStream(streamData) {
-    const streamKey = `${streamData.platform}-${streamData.streamerId}`;
-    
-    // Update active streams
-    const existingStream = this.activeStreams.get(streamKey);
-    if (existingStream) {
-      existingStream.viewers = streamData.viewers;
-      existingStream.lastUpdate = new Date();
-    } else {
-      this.activeStreams.set(streamKey, {
-        ...streamData,
-        firstSeen: new Date(),
-        lastUpdate: new Date(),
-        peakViewers: streamData.viewers,
-        hasToken: false,
+      this.logEvent({
+        type: 'trade',
+        timestamp: new Date(),
+        mint: token.mint,
+        data: { priceChange, newPrice: newData.price, newMarketCap: newData.marketCap },
       });
     }
-    
-    // Update peak viewers
-    const stream = this.activeStreams.get(streamKey);
-    if (streamData.viewers > stream.peakViewers) {
-      stream.peakViewers = streamData.viewers;
-    }
-    
-    // Add to history
-    this.streamHistory.push({
-      timestamp: new Date(),
-      ...streamData,
-    });
-    
-    // Keep only last 1000 entries
-    if (this.streamHistory.length > 1000) {
-      this.streamHistory.shift();
-    }
-  }
 
-  async evaluateTokenLaunches() {
-    for (const [streamKey, stream] of this.activeStreams.entries()) {
-      if (stream.hasToken) continue;
-      
-      // Check if stream meets launch criteria
-      const meetsViewerThreshold = stream.viewers >= this.config.minViewersForLaunch;
-      const meetsPeakViewers = stream.peakViewers >= this.config.minViewersForLaunch;
-      
-      if (meetsViewerThreshold || meetsPeakViewers) {
-        // Get additional streamer info
-        const streamerInfo = await this.getStreamerInfo(stream);
-        
-        if (this.shouldLaunchToken(stream, streamerInfo)) {
-          await this.launchCreatorToken(stream, streamerInfo);
+    // Buyer milestone alerts
+    for (const milestone of this.config.buyerMilestones!) {
+      if (newData.buyers >= milestone && token.totalBuyers < milestone) {
+        if (!token.alerts.buyerMilestones.includes(milestone)) {
+          await this.sendAlert(`👥 ${token.symbol} reached ${milestone} buyers! 
+            Current buyers: ${newData.buyers}
+            Market cap: ${newData.marketCap.toFixed(2)} SOL
+            Progress: ${newData.progress.toFixed(1)}%`);
+
+          token.alerts.buyerMilestones.push(milestone);
+
+          this.logEvent({
+            type: 'milestone',
+            timestamp: new Date(),
+            mint: token.mint,
+            data: { milestone, totalBuyers: newData.buyers },
+          });
         }
       }
     }
+
+    // Curve completion alert
+    if (newData.isComplete && !token.isComplete && this.config.enableCompletionAlerts) {
+      await this.sendAlert(`🎉 ${token.symbol} bonding curve completed! 
+        Final market cap: ${newData.marketCap.toFixed(2)} SOL
+        Total buyers: ${newData.buyers}
+        Token is now trading on DEX!`);
+
+      token.alerts.completionAlert = true;
+
+      this.logEvent({
+        type: 'completion',
+        timestamp: new Date(),
+        mint: token.mint,
+        data: { finalMarketCap: newData.marketCap, totalBuyers: newData.buyers },
+      });
+    }
   }
 
-  async getStreamerInfo(stream) {
-    try {
-      if (stream.platform === 'twitch') {
-        const response = await axios.get(`${this.apis.twitch.baseURL}/users`, {
-          headers: this.apis.twitch.headers,
-          params: { id: stream.streamerId },
+  async scanForNewTokens() {
+    // In a real implementation, you would listen for program events
+    // or scan the blockchain for new bonding curve creations
+    // For this example, we'll simulate this functionality
+    
+    // This could be implemented by:
+    // 1. Listening to program logs
+    // 2. Scanning recent transactions
+    // 3. Using a webhook or websocket connection
+    // 4. Periodically checking known program accounts
+  }
+
+  async sendAlert(message: string) {
+    const timestamp = new Date().toLocaleString();
+    
+    // Console notification
+    if (this.config.notifications?.console) {
+      console.log(`🔔 [${timestamp}] ALERT: ${message}`);
+    }
+
+    // Discord webhook (if configured)
+    if (this.config.notifications?.discord?.webhookUrl) {
+      try {
+        await fetch(this.config.notifications.discord.webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: `🔔 **Yoink Alert**\n${message}`,
+          }),
         });
-        
-        const user = response.data.data[0];
-        return {
-          followers: await this.getTwitchFollowerCount(stream.streamerId),
-          description: user.description,
-          profileImage: user.profile_image_url,
-          verified: user.broadcaster_type === 'partner',
-          createdAt: new Date(user.created_at),
-        };
-      }
-      
-      // Add YouTube logic here
-      return { followers: 0, verified: false };
-      
-    } catch (error) {
-      console.error('❌ Error getting streamer info:', error.message);
-      return { followers: 0, verified: false };
-    }
-  }
-
-  async getTwitchFollowerCount(userId) {
-    try {
-      const response = await axios.get(`${this.apis.twitch.baseURL}/users/follows`, {
-        headers: this.apis.twitch.headers,
-        params: { to_id: userId },
-      });
-      
-      return response.data.total;
-    } catch (error) {
-      return 0;
-    }
-  }
-
-  shouldLaunchToken(stream, streamerInfo) {
-    // Check follower threshold
-    if (streamerInfo.followers < this.config.minFollowersForLaunch) {
-      return false;
-    }
-    
-    // Check verification requirement
-    if (this.config.requireVerification && !streamerInfo.verified) {
-      return false;
-    }
-    
-    // Check if token already exists for this streamer
-    if (this.launchedTokens.has(stream.streamerId)) {
-      return false;
-    }
-    
-    console.log(`✅ ${stream.streamerName} meets token launch criteria!`);
-    return true;
-  }
-
-  async launchCreatorToken(stream, streamerInfo) {
-    try {
-      console.log(`🚀 Launching creator token for ${stream.streamerName}...`);
-      
-      const tokenMetadata = {
-        name: `${stream.streamerName} Token`,
-        symbol: this.generateTokenSymbol(stream.streamerName),
-        description: `Creator token for ${stream.streamerName} - ${streamerInfo.description || 'Live streamer'}`,
-        image: streamerInfo.profileImage,
-        initialSupply: this.config.initialSupply,
-        initialPrice: this.config.initialPrice,
-        creatorShare: this.config.creatorShare,
-        platform: stream.platform,
-        streamerId: stream.streamerId,
-      };
-      
-      const result = await this.yoink.createCreatorToken(tokenMetadata);
-      
-      if (result.success) {
-        const tokenData = {
-          tokenAddress: result.tokenAddress,
-          creatorAddress: result.creatorAddress,
-          launchTime: new Date(),
-          initialPrice: this.config.initialPrice,
-          initialSupply: this.config.initialSupply,
-          stream: stream,
-          streamerInfo: streamerInfo,
-        };
-        
-        this.launchedTokens.set(stream.streamerId, tokenData);
-        stream.hasToken = true;
-        
-        console.log(`🎉 Token launched successfully!`);
-        console.log(`Token Address: ${result.tokenAddress}`);
-        console.log(`Creator Address: ${result.creatorAddress}`);
-        
-        // Send notification
-        await this.sendLaunchNotification(stream, tokenData);
-        
-      } else {
-        console.error(`❌ Failed to launch token: ${result.error}`);
-      }
-      
-    } catch (error) {
-      console.error('❌ Error launching creator token:', error.message);
-    }
-  }
-
-  generateTokenSymbol(streamerName) {
-    // Generate a token symbol from streamer name
-    return streamerName
-      .toUpperCase()
-      .replace(/[^A-Z0-9]/g, '')
-      .substring(0, 8);
-  }
-
-  async sendLaunchNotification(stream, tokenData) {
-    const message = `🚀 NEW CREATOR TOKEN LAUNCHED!\n\n` +
-      `Streamer: ${stream.streamerName}\n` +
-      `Platform: ${stream.platform.toUpperCase()}\n` +
-      `Current Viewers: ${stream.viewers}\n` +
-      `Peak Viewers: ${stream.peakViewers}\n` +
-      `Token: ${tokenData.tokenAddress}\n` +
-      `Initial Price: ${this.config.initialPrice} SOL`;
-    
-    console.log('🔔 LAUNCH NOTIFICATION:');
-    console.log(message);
-    
-    // Here you could integrate with Discord, Telegram, email, etc.
-  }
-
-  async updateStreamMetrics() {
-    // Clean up offline streams
-    const currentTime = new Date();
-    for (const [streamKey, stream] of this.activeStreams.entries()) {
-      const timeSinceUpdate = currentTime - stream.lastUpdate;
-      
-      // Remove streams that haven't updated in 5 minutes
-      if (timeSinceUpdate > 300000) {
-        console.log(`📴 ${stream.streamerName} went offline`);
-        this.activeStreams.delete(streamKey);
+      } catch (error) {
+        console.error('Failed to send Discord notification:', error);
       }
     }
-    
-    // Display current statistics
-    this.displayStatistics();
+
+    // Telegram bot (if configured)
+    if (this.config.notifications?.telegram) {
+      try {
+        const { botToken, chatId } = this.config.notifications.telegram;
+        await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: `🔔 Yoink Alert\n${message}`,
+            parse_mode: 'HTML',
+          }),
+        });
+      } catch (error) {
+        console.error('Failed to send Telegram notification:', error);
+      }
+    }
   }
 
-  displayStatistics() {
+  logEvent(event: TokenEvent) {
+    this.eventHistory.push(event);
+    
+    // Keep only last 1000 events
+    if (this.eventHistory.length > 1000) {
+      this.eventHistory.shift();
+    }
+  }
+
+  displayStatus() {
     console.clear();
-    console.log('🎥 YOINK STREAM MONITOR & TOKEN LAUNCHER');
-    console.log('======================================');
-    console.log(`Active Streams: ${this.activeStreams.size}`);
-    console.log(`Tokens Launched: ${this.launchedTokens.size}`);
-    console.log(`Last Update: ${new Date().toLocaleTimeString()}`);
+    console.log('🔍 YOINK BONDING CURVE MONITOR');
+    console.log('==============================');
+    console.log(`Last Scan: ${this.lastScanTime?.toLocaleString() || 'Never'}`);
+    console.log(`Monitored Tokens: ${this.monitoredTokens.size}`);
+    console.log(`Events Today: ${this.getTodayEventCount()}`);
     console.log();
-    
-    if (this.activeStreams.size > 0) {
-      console.log('📺 ACTIVE STREAMS:');
-      console.log('------------------');
-      this.activeStreams.forEach(stream => {
-        const hasTokenIcon = stream.hasToken ? '💰' : '⭕';
-        console.log(`${hasTokenIcon} ${stream.streamerName} (${stream.platform.toUpperCase()})`);
-        console.log(`   Viewers: ${stream.viewers} | Peak: ${stream.peakViewers}`);
-        console.log(`   Title: ${stream.title}`);
+
+    // Active tokens summary
+    const activeTokens = Array.from(this.monitoredTokens.values()).filter(t => !t.isComplete);
+    const completedTokens = Array.from(this.monitoredTokens.values()).filter(t => t.isComplete);
+
+    console.log('📊 MARKET OVERVIEW');
+    console.log('------------------');
+    console.log(`Active Curves: ${activeTokens.length}`);
+    console.log(`Completed Curves: ${completedTokens.length}`);
+    console.log(`Total Market Cap: ${Array.from(this.monitoredTokens.values()).reduce((sum, t) => sum + t.marketCap, 0).toFixed(2)} SOL`);
+    console.log();
+
+    // Recent events
+    const recentEvents = this.eventHistory.slice(-5).reverse();
+    if (recentEvents.length > 0) {
+      console.log('🕐 RECENT EVENTS');
+      console.log('----------------');
+      recentEvents.forEach(event => {
+        const time = event.timestamp.toLocaleTimeString();
+        const tokenSymbol = this.monitoredTokens.get(event.mint)?.symbol || 'UNKNOWN';
+        
+        switch (event.type) {
+          case 'launch':
+            console.log(`${time} 🚀 ${tokenSymbol} launched`);
+            break;
+          case 'trade':
+            console.log(`${time} 📈 ${tokenSymbol} price changed by ${event.data.priceChange.toFixed(2)}%`);
+            break;
+          case 'completion':
+            console.log(`${time} 🎉 ${tokenSymbol} curve completed`);
+            break;
+          case 'milestone':
+            console.log(`${time} 👥 ${tokenSymbol} reached ${event.data.milestone} buyers`);
+            break;
+        }
+      });
+      console.log();
+    }
+
+    // Top performers
+    const sortedTokens = Array.from(this.monitoredTokens.values())
+      .sort((a, b) => b.marketCap - a.marketCap)
+      .slice(0, 5);
+
+    if (sortedTokens.length > 0) {
+      console.log('🏆 TOP TOKENS BY MARKET CAP');
+      console.log('----------------------------');
+      sortedTokens.forEach((token, index) => {
+        const status = token.isComplete ? '✅' : '🔄';
+        console.log(`${index + 1}. ${status} ${token.symbol}`);
+        console.log(`   Market Cap: ${token.marketCap.toFixed(2)} SOL`);
+        console.log(`   Buyers: ${token.totalBuyers}`);
+        console.log(`   Progress: ${token.curveProgress.toFixed(1)}%`);
         console.log();
       });
     }
+  }
+
+  getTodayEventCount(): number {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     
-    if (this.launchedTokens.size > 0) {
-      console.log('🚀 LAUNCHED TOKENS:');
-      console.log('-------------------');
-      this.launchedTokens.forEach((token, streamerId) => {
-        console.log(`💰 ${token.stream.streamerName}`);
-        console.log(`   Token: ${token.tokenAddress}`);
-        console.log(`   Launched: ${token.launchTime.toLocaleString()}`);
-        console.log();
-      });
-    }
+    return this.eventHistory.filter(event => event.timestamp >= today).length;
+  }
+
+  exportData() {
+    const exportData = {
+      timestamp: new Date().toISOString(),
+      monitoredTokens: Array.from(this.monitoredTokens.values()),
+      eventHistory: this.eventHistory,
+      config: this.config,
+    };
+
+    const filename = `bonding-curve-monitor-${new Date().toISOString().split('T')[0]}.json`;
+    console.log(`📁 Export data available as: ${filename}`);
+    return exportData;
   }
 
   stop() {
-    console.log('🛑 Stopping stream monitor...');
+    console.log('🛑 Stopping bonding curve monitor...');
     this.isRunning = false;
   }
 
-  sleep(ms) {
+  sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 }
 
 // Usage Example
 async function main() {
-  const monitor = new StreamMonitorAndLauncher({
-    network: 'mainnet-beta',
-    wallet: yourWalletAdapter,
+  const monitor = new BondingCurveMonitor({
+    rpcUrl: 'https://eclipse.lgns.net',
+    scanInterval: 30000, // 30 seconds
+    priceChangeThreshold: 20, // 20% price change alerts
+    buyerMilestones: [5, 10, 25, 50, 100, 250, 500],
+    enableCompletionAlerts: true,
+    maxTokensToTrack: 50,
     
-    // Platform API Keys
-    twitchClientId: 'YOUR_TWITCH_CLIENT_ID',
-    twitchClientSecret: 'YOUR_TWITCH_CLIENT_SECRET',
-    youtubeApiKey: 'YOUR_YOUTUBE_API_KEY',
-    
-    // Launch Criteria
-    minViewersForLaunch: 75,
-    minFollowersForLaunch: 500,
-    requireVerification: false,
-    
-    // Token Settings
-    initialSupply: 1000000,
-    initialPrice: 0.002, // SOL
-    creatorShare: 15, // 15%
-    
-    platforms: ['twitch'], // Start with just Twitch
+    notifications: {
+      console: true,
+      // Uncomment and configure for external notifications
+      // discord: {
+      //   webhookUrl: 'YOUR_DISCORD_WEBHOOK_URL'
+      // },
+      // telegram: {
+      //   botToken: 'YOUR_BOT_TOKEN',
+      //   chatId: 'YOUR_CHAT_ID'
+      // }
+    },
   });
   
   await monitor.start();
+  
+  // Export data every hour
+  setInterval(() => {
+    monitor.exportData();
+  }, 3600000);
   
   // Graceful shutdown
   process.on('SIGINT', () => {
@@ -507,91 +515,171 @@ async function main() {
   });
 }
 
-// Run the stream monitor
+// Run the monitor
 main().catch(console.error);
 ```
 
 ## Features
 
-### 🎥 Multi-Platform Monitoring
-- Twitch stream monitoring
-- YouTube Live integration
-- Real-time viewer tracking
-- Stream metadata collection
+### 🔍 Real-time Monitoring
+- Continuous bonding curve token scanning
+- Price and market cap tracking
+- Buyer count monitoring
+- Curve progression analysis
 
-### 🚀 Automated Token Launch
-- Configurable launch criteria
-- Automatic token creation
-- Creator verification checks
-- Initial distribution management
+### � Smart Alerts
+- Configurable price change thresholds
+- Buyer milestone notifications
+- Curve completion alerts
+- Multi-platform notification support (Discord, Telegram)
 
-### 📊 Analytics & Tracking
-- Peak viewer tracking
-- Stream duration monitoring
-- Token performance metrics
+### 📊 Market Intelligence
+- Token launch detection
+- Performance tracking
+- Event history logging
+- Market overview dashboard
+
+### 📈 Analytics & Reporting
 - Historical data collection
-
-### 🔔 Notifications
-- Launch announcements
-- Stream status updates
-- Performance alerts
-- Integration ready for Discord/Telegram
+- Market trends analysis
+- Performance metrics
+- Data export capabilities
 
 ## Configuration Options
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `minViewersForLaunch` | Number | `100` | Minimum concurrent viewers |
-| `minFollowersForLaunch` | Number | `1000` | Minimum follower count |
-| `requireVerification` | Boolean | `true` | Require platform verification |
-| `initialSupply` | Number | `1000000` | Token initial supply |
-| `initialPrice` | Number | `0.001` | Initial price in SOL |
-| `creatorShare` | Number | `10` | Creator's token percentage |
+| `rpcUrl` | String | `'https://eclipse.lgns.net'` | Solana RPC endpoint |
+| `scanInterval` | Number | `30000` | Scan frequency (ms) |
+| `priceChangeThreshold` | Number | `15` | Price change alert (%) |
+| `buyerMilestones` | Array | `[10,25,50,100,250,500,1000]` | Buyer count alerts |
+| `enableCompletionAlerts` | Boolean | `true` | Alert on curve completion |
+| `maxTokensToTrack` | Number | `100` | Maximum tokens to monitor |
 
-## Running the Script
+## Notification Setup
 
-1. **Get API Keys**:
-   - Twitch: Create app at [dev.twitch.tv](https://dev.twitch.tv)
-   - YouTube: Get API key from [Google Cloud Console](https://console.cloud.google.com)
+### Discord Webhook
+```typescript
+notifications: {
+  discord: {
+    webhookUrl: 'https://discord.com/api/webhooks/YOUR_WEBHOOK_URL'
+  }
+}
+```
 
-2. **Install dependencies**:
+### Telegram Bot
+```typescript
+notifications: {
+  telegram: {
+    botToken: 'YOUR_BOT_TOKEN',
+    chatId: 'YOUR_CHAT_ID'
+  }
+}
+```
+
+## Running the Monitor
+
+1. **Install dependencies**:
    ```bash
-   npm install yoink-sdk axios @solana/web3.js
+   npm install @solana/web3.js @coral-xyz/anchor
    ```
 
-3. **Configure and run**:
+2. **Configure monitoring**:
+   ```typescript
+   const monitor = new BondingCurveMonitor({
+     scanInterval: 30000, // 30 seconds
+     priceChangeThreshold: 25, // 25% price changes
+     buyerMilestones: [10, 50, 100, 500],
+     notifications: {
+       console: true,
+       discord: { webhookUrl: 'YOUR_WEBHOOK' }
+     }
+   });
+   ```
+
+3. **Start monitoring**:
    ```bash
-   node stream-monitor.js
+   npx ts-node bonding-curve-monitor.ts
    ```
 
 ## Sample Output
 
 ```
-🎥 YOINK STREAM MONITOR & TOKEN LAUNCHER
-======================================
-Active Streams: 3
-Tokens Launched: 1
-Last Update: 2:45:30 PM
+🔍 YOINK BONDING CURVE MONITOR
+==============================
+Last Scan: 11/4/2025, 3:45:30 PM
+Monitored Tokens: 15
+Events Today: 47
 
-📺 ACTIVE STREAMS:
+📊 MARKET OVERVIEW
 ------------------
-💰 StreamerName (TWITCH)
-   Viewers: 150 | Peak: 200
-   Title: Playing New Game!
+Active Curves: 12
+Completed Curves: 3
+Total Market Cap: 1,234.56 SOL
 
-⭕ AnotherStreamer (TWITCH)
-   Viewers: 75 | Peak: 85
-   Title: Just Chatting
+🕐 RECENT EVENTS
+----------------
+3:45:20 PM 🚀 TOKEN_ABC12345 launched
+3:44:15 PM 📈 TOKEN_HbiDw6U5 price changed by +23.45%
+3:43:08 PM 👥 TOKEN_DEF67890 reached 100 buyers
+3:42:30 PM 🎉 TOKEN_GHI01234 curve completed
 
-🚀 LAUNCHED TOKENS:
--------------------
-💰 StreamerName
-   Token: 7xK9...w2Fy
-   Launched: 11/4/2025, 2:30:15 PM
+🏆 TOP TOKENS BY MARKET CAP
+----------------------------
+1. ✅ TOKEN_HbiDw6U5
+   Market Cap: 85.00 SOL
+   Buyers: 234
+   Progress: 100.0%
+
+2. 🔄 TOKEN_ABC12345  
+   Market Cap: 67.89 SOL
+   Buyers: 156
+   Progress: 79.9%
 ```
+
+## Alert Examples
+
+### Price Change Alert
+```
+🔔 [3:45:30 PM] ALERT: 📈 TOKEN_HbiDw6U5 price surged by 25.67%! 
+New price: 0.00456789 SOL
+Market cap: 78.90 SOL
+```
+
+### Milestone Alert
+```
+🔔 [3:44:15 PM] ALERT: 👥 TOKEN_ABC12345 reached 100 buyers! 
+Current buyers: 103
+Market cap: 45.67 SOL
+Progress: 53.7%
+```
+
+### Completion Alert
+```
+🔔 [3:43:08 PM] ALERT: 🎉 TOKEN_DEF67890 bonding curve completed! 
+Final market cap: 85.00 SOL
+Total buyers: 267
+Token is now trading on DEX!
+```
+
+## Advanced Features
+
+- **Event Logging**: Comprehensive history of all market events
+- **Data Export**: JSON exports for further analysis
+- **Performance Tracking**: Monitor token performance over time
+- **Custom Filters**: Set specific criteria for monitoring
+- **Real-time Updates**: Live market data with configurable refresh rates
+
+## Integration Ideas
+
+- **Trading Bots**: Connect alerts to automated trading systems
+- **Portfolio Management**: Integrate with portfolio tracking tools
+- **Research Tools**: Export data for market analysis
+- **Community Alerts**: Share insights with trading communities
 
 ## Next Steps
 
 - [📦 Back to SDK Overview](overview.md)
-- [🤖 Try Creator Token Bot](creator-token-bot.md)
-- [📊 View Portfolio Dashboard](portfolio-dashboard.md)
+- [🤖 Try Bonding Curve Trading Bot](creator-token-bot.md)
+- [📊 Portfolio Dashboard](portfolio-dashboard.md)
+- [📈 Market Analytics](creator-analytics.md)

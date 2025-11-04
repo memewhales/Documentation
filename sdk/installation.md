@@ -8,8 +8,8 @@ Before installing the Yoink SDK, make sure you have:
 
 - **Node.js** (version 16 or higher)
 - **npm** or **yarn** package manager
-- A **Solana wallet** (Phantom, Solflare, etc.)
 - Basic knowledge of **JavaScript/TypeScript**
+- **Solana wallet** for signing transactions
 
 ## Installation
 
@@ -31,72 +31,86 @@ yarn add yoink-sdk
 pnpm add yoink-sdk
 ```
 
+## Required Dependencies
+
+The SDK requires these Solana dependencies (automatically installed):
+
+```bash
+npm install @solana/web3.js @solana/spl-token @coral-xyz/anchor
+```
+
 ## Quick Setup
 
 ### 1. Import the SDK
 
-```javascript
+```typescript
 import { YoinkSDK } from 'yoink-sdk';
-
-// Or using CommonJS
-const { YoinkSDK } = require('yoink-sdk');
+import { Connection, Keypair, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
+import { AnchorProvider } from "@coral-xyz/anchor";
+import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
 ```
 
-### 2. Initialize the SDK
+### 2. Initialize Connection and Provider
 
-```javascript
-const yoink = new YoinkSDK({
-  network: 'mainnet-beta', // or 'devnet' for testing
-  endpoint: 'https://api.mainnet-beta.solana.com',
-  wallet: yourWalletAdapter, // Your wallet adapter
-});
+```typescript
+// For testnet (Eclipse)
+const connection = new Connection("https://staging-rpc.dev2.eclipsenetwork.xyz");
+
+// For Solana mainnet
+// const connection = new Connection("https://api.mainnet-beta.solana.com");
+
+const wallet = new NodeWallet(yourKeypair);
+const provider = new AnchorProvider(connection, wallet, { commitment: "confirmed" });
 ```
 
-### 3. Connect to Wallet
+### 3. Create SDK Instance
 
-```javascript
-// Connect wallet
-await yoink.connect();
-
-// Check connection status
-if (yoink.isConnected) {
-  console.log('Connected to wallet:', yoink.publicKey);
-}
+```typescript
+const sdk = new YoinkSDK(provider);
 ```
 
 ## Environment Variables
 
-Create a `.env` file in your project root:
+Create a `.env` file with your RPC endpoint:
 
 ```bash
-# Solana RPC Endpoint
-SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
+# For testnet (current default)
+SOLANA_RPC_URL=https://staging-rpc.dev2.eclipsenetwork.xyz
 
-# Yoink API Base URL
-YOINK_API_URL=https://api.yoink.trade
-
-# Your application name (optional)
-APP_NAME=Your App Name
+# For Solana mainnet
+# SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
 ```
 
 ## Verification
 
-Test your installation with this simple script:
+Test your installation with a simple script:
 
-```javascript
-import { YoinkSDK } from 'yoink-sdk';
+```typescript
+import { YoinkSDK } from "yoink-sdk";
+import { Connection, Keypair, PublicKey } from "@solana/web3.js";
+import { AnchorProvider } from "@coral-xyz/anchor";
+import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
 
-async function testConnection() {
-  const yoink = new YoinkSDK({
-    network: 'devnet', // Use devnet for testing
-  });
+async function testInstallation() {
+  const connection = new Connection(process.env.SOLANA_RPC_URL!);
+  const wallet = new NodeWallet(Keypair.generate());
+  const provider = new AnchorProvider(connection, wallet, { commitment: "confirmed" });
   
-  console.log('SDK Version:', yoink.version);
-  console.log('Network:', yoink.network);
-  console.log('Ready to build with Yoink! 🚀');
+  const sdk = new YoinkSDK(provider);
+  console.log("✅ SDK initialized successfully!");
+  console.log("Program ID:", sdk.program.programId.toBase58());
+  
+  // Test global account fetch
+  try {
+    const global = await sdk.getGlobalAccount();
+    console.log("✅ Connected to Yoink protocol");
+    console.log("Fee basis points:", global.feeBasisPoints.toString());
+  } catch (error) {
+    console.error("❌ Connection failed:", error);
+  }
 }
 
-testConnection();
+testInstallation();
 ```
 
 ## Next Steps
@@ -107,20 +121,33 @@ testConnection();
 
 ## Troubleshooting
 
-### Common Issues
+### TypeError: Cannot read properties of undefined
 
-**"Module not found" error**
-- Make sure you've installed the SDK: `npm install yoink-sdk`
-- Check your Node.js version: `node --version`
+Make sure you're using Node.js 16+ which has built-in support for BigInt.
 
-**Wallet connection issues**
-- Ensure your wallet is unlocked
-- Check network settings (mainnet vs devnet)
-- Verify wallet adapter compatibility
+### Module not found errors
 
-**Network errors**
-- Check your internet connection
-- Verify RPC endpoint is working
-- Try switching to a different Solana RPC endpoint
+Install all required dependencies:
 
-Need help? Join our [Discord community](https://discord.gg/yoink) or check our [FAQ](../support/faq.md).
+```bash
+npm install @solana/web3.js @solana/spl-token @coral-xyz/anchor bn.js
+```
+
+### TypeScript compilation errors
+
+Update your `tsconfig.json`:
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ES2020",
+    "lib": ["ES2020"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true
+  }
+}
+```
+
+Need help? Visit our [GitHub repository](https://github.com/yoinknow/yoink-sdk) or check the [README](https://github.com/yoinknow/yoink-sdk/blob/main/README.md).

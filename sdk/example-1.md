@@ -1,20 +1,20 @@
 # 📝 Example Script 1: Basic Token Trading Bot
 
-This example demonstrates how to create a simple trading bot that monitors token prices and executes trades based on basic criteria.
+This example demonstrates how to create a simple trading bot that monitors bonding curve tokens and executes trades with slippage protection using the real Yoink SDK.
 
 ## Overview
 
 This script will:
-- Monitor multiple tokens for price changes
-- Execute buy orders when price drops below a threshold
-- Execute sell orders when price rises above a threshold
-- Log all trading activity
+- Monitor bonding curve tokens for price changes and market cap
+- Execute buy orders when certain conditions are met
+- Execute sell orders based on profit targets
+- Track portfolio performance and display real-time statistics
 
 ## Prerequisites
 
-- Yoink SDK installed
-- Wallet with SOL for trading
-- Basic understanding of trading concepts
+- Yoink SDK installed: `npm install yoink-sdk`
+- Funded Solana wallet (keypair with SOL)
+- Basic understanding of bonding curves and slippage
 
 ## Script Code
 

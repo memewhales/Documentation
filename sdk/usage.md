@@ -1,242 +1,290 @@
 # 🎯 Usage Guide
 
-Learn how to use the Yoink SDK to build powerful creator token applications.
+Learn how to use the Yoink SDK to interact with bonding curve tokens on Solana.
 
 ## Basic Usage
 
 ### Initializing the SDK
 
-```javascript
-import { YoinkSDK } from 'yoink-sdk';
+```typescript
+import { YoinkSDK } from "yoink-sdk";
+import { Connection, Keypair, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
+import { AnchorProvider } from "@coral-xyz/anchor";
+import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
 
-const yoink = new YoinkSDK({
-  network: 'mainnet-beta',
-  endpoint: process.env.SOLANA_RPC_URL,
-  wallet: walletAdapter,
-  options: {
-    commitment: 'confirmed',
-    preflightCommitment: 'processed',
-  }
-});
+// Setup connection and provider
+const connection = new Connection("https://staging-rpc.dev2.eclipsenetwork.xyz");
+const wallet = new NodeWallet(yourKeypair);
+const provider = new AnchorProvider(connection, wallet, { commitment: "confirmed" });
+
+// Initialize SDK
+const sdk = new YoinkSDK(provider);
 ```
 
 ## Core Features
-
-### 🪙 Token Operations
-
-#### Get Token Information
-
-```javascript
-// Get token details
-const token = await yoink.getToken('token_address_here');
-console.log('Token:', token.name, token.symbol);
-console.log('Price:', token.price, 'SOL');
-console.log('Market Cap:', token.marketCap, 'SOL');
-```
-
-#### Create a New Token
-
-```javascript
-const tokenData = {
-  name: 'My Creator Token',
-  symbol: 'MCT',
-  description: 'A token for my amazing content',
-  image: 'https://example.com/image.png',
-  // Additional metadata
-};
-
-const transaction = await yoink.createToken(tokenData);
-const signature = await yoink.sendTransaction(transaction);
-console.log('Token created:', signature);
-```
 
 ### 💰 Trading Operations
 
 #### Buy Tokens
 
-```javascript
-// Buy tokens with SOL
-const buyTransaction = await yoink.buyTokens({
-  tokenAddress: 'token_address_here',
-  solAmount: 0.1, // Amount in SOL
-  slippage: 5, // 5% slippage tolerance
-});
+```typescript
+// Basic buy with SOL
+const buyResult = await sdk.buy(
+  userKeypair,                              // Your funded keypair
+  new PublicKey("MINT_ADDRESS"),            // Token mint address
+  BigInt(0.1 * LAMPORTS_PER_SOL),          // 0.1 SOL to spend
+  BigInt(500),                             // 5% slippage (500 basis points)
+  {                                        // Optional priority fees
+    unitLimit: 400000,
+    unitPrice: 100000
+  }
+);
 
-const signature = await yoink.sendTransaction(buyTransaction);
-console.log('Purchase completed:', signature);
+if (buyResult.success) {
+  console.log("✅ Buy successful! Signature:", buyResult.signature);
+} else {
+  console.error("❌ Buy failed:", buyResult.error);
+}
 ```
 
 #### Sell Tokens
 
-```javascript
+```typescript
 // Sell tokens for SOL
-const sellTransaction = await yoink.sellTokens({
-  tokenAddress: 'token_address_here',
-  tokenAmount: 1000, // Amount of tokens to sell
-  slippage: 5,
-});
+const tokenAmount = BigInt(1000000 * Math.pow(10, 6)); // 1M tokens (6 decimals)
 
-const signature = await yoink.sendTransaction(sellTransaction);
-console.log('Sale completed:', signature);
+const sellResult = await sdk.sell(
+  userKeypair,                    // Your keypair with tokens
+  new PublicKey("MINT_ADDRESS"),  // Token mint address
+  tokenAmount,                    // Amount to sell
+  BigInt(500)                     // 5% slippage
+);
+
+if (sellResult.success) {
+  console.log("✅ Sell successful! Signature:", sellResult.signature);
+}
 ```
 
-### 📊 Data & Analytics
+#### Get Price Quotes
 
-#### Get Token Price History
+```typescript
+// Get buy quote before purchasing
+const buyQuote = await sdk.getBuyQuote(
+  new PublicKey("MINT_ADDRESS"),
+  BigInt(0.1 * LAMPORTS_PER_SOL),
+  BigInt(500) // 5% slippage
+);
 
-```javascript
-const priceHistory = await yoink.getPriceHistory('token_address_here', {
-  interval: '1h',
-  limit: 100,
-});
+console.log("You will receive:", buyQuote.tokenAmount, "tokens");
+console.log("Price per token:", buyQuote.pricePerToken, "SOL");
+console.log("Price impact:", buyQuote.priceImpact.toFixed(2), "%");
 
-console.log('Price data points:', priceHistory.length);
+// Get sell quote
+const sellQuote = await sdk.getSellQuote(
+  new PublicKey("MINT_ADDRESS"),
+  BigInt(1000000 * Math.pow(10, 6)), // 1M tokens
+  BigInt(500)
+);
+
+console.log("You will receive:", Number(sellQuote.solAmount) / LAMPORTS_PER_SOL, "SOL");
+console.log("Price impact:", sellQuote.priceImpact.toFixed(2), "%");
 ```
 
-#### Get Trading Activity
+### 📊 Market Data & Analytics
 
-```javascript
-const trades = await yoink.getRecentTrades('token_address_here', {
-  limit: 50,
-});
+#### Get Bonding Curve Information
 
-trades.forEach(trade => {
-  console.log(`${trade.type}: ${trade.amount} tokens for ${trade.price} SOL`);
-});
+```typescript
+const bondingCurve = await sdk.getBondingCurveAccount(new PublicKey("MINT_ADDRESS"));
+
+if (bondingCurve) {
+  console.log("Market Cap:", Number(bondingCurve.getMarketCapSOL()) / LAMPORTS_PER_SOL, "SOL");
+  console.log("Price per Token:", bondingCurve.getPricePerToken(), "SOL");
+  console.log("Total Supply:", bondingCurve.tokenTotalSupply.toString());
+  console.log("Virtual SOL Reserves:", bondingCurve.virtualSolReserves.toString());
+  console.log("Virtual Token Reserves:", bondingCurve.virtualTokenReserves.toString());
+  console.log("Real SOL Reserves:", bondingCurve.realSolReserves.toString());
+  console.log("Real Token Reserves:", bondingCurve.realTokenReserves.toString());
+  console.log("Is Complete:", bondingCurve.complete);
+  console.log("Total Buyers:", bondingCurve.totalBuyers.toString());
+}
 ```
 
-### 👤 Profile Management
+#### Get Protocol Information
 
-#### Get User Profile
+```typescript
+const globalAccount = await sdk.getGlobalAccount();
 
-```javascript
-const profile = await yoink.getUserProfile(walletAddress);
-console.log('Username:', profile.username);
-console.log('Total Tokens:', profile.tokensOwned.length);
-```
-
-#### Update Profile
-
-```javascript
-await yoink.updateProfile({
-  username: 'newUsername',
-  bio: 'Creator and trader',
-  profilePicture: 'https://example.com/avatar.png',
-});
-```
-
-### 📺 Stream Integration
-
-#### Attach Stream to Token
-
-```javascript
-const streamData = {
-  tokenAddress: 'token_address_here',
-  streamUrl: 'rtmp://stream.url',
-  platform: 'twitch', // or 'youtube', 'custom'
-  streamerId: 'streamer_id',
-};
-
-await yoink.attachStream(streamData);
-```
-
-#### Get Live Streams
-
-```javascript
-const liveStreams = await yoink.getLiveStreams({
-  limit: 20,
-  sortBy: 'viewers', // or 'recent', 'price'
-});
-
-liveStreams.forEach(stream => {
-  console.log(`${stream.title} - ${stream.viewers} viewers`);
-});
+console.log("Protocol initialized:", globalAccount.initialized);
+console.log("Fee basis points:", globalAccount.feeBasisPoints.toString(), "(", Number(globalAccount.feeBasisPoints) / 100, "%)");
+console.log("Fee recipient:", globalAccount.feeRecipient.toBase58());
+console.log("Authority:", globalAccount.authority.toBase58());
+console.log("Initial virtual SOL reserves:", globalAccount.initialVirtualSolReserves.toString());
+console.log("Initial virtual token reserves:", globalAccount.initialVirtualTokenReserves.toString());
+console.log("Buybacks enabled:", globalAccount.buybacksEnabled);
+console.log("Early bird enabled:", globalAccount.earlyBirdEnabled);
 ```
 
 ## Advanced Features
 
-### 🔄 Real-time Subscriptions
+### 🔄 Price Monitoring
 
-```javascript
-// Subscribe to price updates
-yoink.subscribeToPrice('token_address_here', (priceData) => {
-  console.log('New price:', priceData.price, 'SOL');
-  console.log('24h change:', priceData.change24h, '%');
-});
+```typescript
+async function monitorPrice(mintAddress: PublicKey, intervalMs: number = 10000) {
+  console.log(`🔍 Monitoring price for ${mintAddress.toBase58()}`);
+  
+  setInterval(async () => {
+    try {
+      const curve = await sdk.getBondingCurveAccount(mintAddress);
+      if (curve) {
+        const marketCap = Number(curve.getMarketCapSOL()) / LAMPORTS_PER_SOL;
+        const pricePerToken = curve.getPricePerToken();
+        
+        console.log(`💰 Market Cap: ${marketCap.toFixed(4)} SOL`);
+        console.log(`📈 Price: ${pricePerToken} SOL per token`);
+        console.log(`👥 Total Buyers: ${curve.totalBuyers.toString()}`);
+        console.log("---");
+      }
+    } catch (error) {
+      console.error("❌ Error fetching price:", error);
+    }
+  }, intervalMs);
+}
 
-// Subscribe to new trades
-yoink.subscribeToTrades('token_address_here', (trade) => {
-  console.log(`New ${trade.type}:`, trade.amount, 'tokens');
-});
+// Monitor every 10 seconds
+monitorPrice(new PublicKey("MINT_ADDRESS"));
 ```
 
-### 🛠️ Custom Transactions
+### 🎯 Smart Trading with Price Checks
 
-```javascript
-// Build custom transaction
-const customTx = await yoink.buildTransaction([
-  // Your custom instructions
-]);
-
-// Sign and send
-const signature = await yoink.sendTransaction(customTx);
-```
-
-### ⚙️ Configuration Options
-
-```javascript
-// Update SDK configuration
-yoink.updateConfig({
-  slippageTolerance: 10, // Default slippage
-  priorityFee: 0.001, // SOL
-  timeout: 30000, // 30 seconds
-});
+```typescript
+async function smartBuy(
+  mintAddress: PublicKey,
+  solAmount: bigint,
+  maxPriceImpact: number = 5,
+  maxSlippage: number = 500
+): Promise<boolean> {
+  try {
+    // First get a quote to check price impact
+    const quote = await sdk.getBuyQuote(mintAddress, solAmount, BigInt(maxSlippage));
+    
+    console.log(`💡 Quote: ${quote.tokenAmount} tokens for ${Number(solAmount) / LAMPORTS_PER_SOL} SOL`);
+    console.log(`📊 Price impact: ${quote.priceImpact.toFixed(2)}%`);
+    
+    if (quote.priceImpact > maxPriceImpact) {
+      console.log(`⚠️ Price impact too high (${quote.priceImpact.toFixed(2)}% > ${maxPriceImpact}%)`);
+      return false;
+    }
+    
+    // Execute the buy if price impact is acceptable
+    const result = await sdk.buy(
+      userKeypair,
+      mintAddress,
+      solAmount,
+      BigInt(maxSlippage)
+    );
+    
+    if (result.success) {
+      console.log("✅ Smart buy executed successfully!");
+      console.log("🔗 Signature:", result.signature);
+      return true;
+    } else {
+      console.error("❌ Smart buy failed:", result.error);
+      return false;
+    }
+  } catch (error) {
+    console.error("❌ Smart buy error:", error);
+    return false;
+  }
+}
 ```
 
 ## Error Handling
 
-```javascript
-try {
-  const result = await yoink.buyTokens({
-    tokenAddress: 'invalid_address',
-    solAmount: 0.1,
-  });
-} catch (error) {
-  if (error.code === 'INSUFFICIENT_BALANCE') {
-    console.log('Not enough SOL in wallet');
-  } else if (error.code === 'TOKEN_NOT_FOUND') {
-    console.log('Token does not exist');
-  } else {
-    console.log('Transaction failed:', error.message);
+### Common Error Patterns
+
+```typescript
+async function safeTrade() {
+  try {
+    const result = await sdk.buy(
+      userKeypair,
+      mintAddress,
+      BigInt(0.1 * LAMPORTS_PER_SOL),
+      BigInt(500)
+    );
+    
+    if (!result.success) {
+      if (result.error instanceof Error) {
+        const errorMessage = result.error.message.toLowerCase();
+        
+        if (errorMessage.includes("insufficient funds")) {
+          console.log("❌ Not enough SOL in wallet");
+        } else if (errorMessage.includes("slippage")) {
+          console.log("❌ Price moved too much, try increasing slippage");
+        } else if (errorMessage.includes("account not found")) {
+          console.log("❌ Token or bonding curve not found");
+        } else {
+          console.log("❌ Transaction failed:", result.error.message);
+        }
+      }
+    }
+  } catch (error) {
+    console.error("❌ Unexpected error:", error);
   }
 }
+```
+
+## Constants & Utilities
+
+### Available Constants
+
+```typescript
+import { 
+  GLOBAL_ACCOUNT_SEED,    // "global"
+  BONDING_CURVE_SEED,     // "bonding-curve"
+  HOLDER_STATS_SEED,      // "holder-stats"
+  DEFAULT_DECIMALS        // 6
+} from "yoink-sdk";
+```
+
+### Helper Functions
+
+```typescript
+// Get Program Derived Addresses (PDAs)
+const bondingCurvePDA = sdk.getBondingCurvePDA(mintAddress);
+const globalPDA = sdk.getGlobalPDA();
+const holderStatsPDA = sdk.getHolderStatsPDA(mintAddress, userPublicKey);
+
+console.log("Bonding Curve PDA:", bondingCurvePDA.toBase58());
+console.log("Global PDA:", globalPDA.toBase58());
+console.log("Holder Stats PDA:", holderStatsPDA.toBase58());
 ```
 
 ## Best Practices
 
 ### 🔐 Security
 
-- Always validate user inputs
-- Use appropriate slippage settings
-- Implement proper error handling
-- Never expose private keys
+- Always validate mint addresses before trading
+- Use appropriate slippage settings for market conditions
+- Implement proper error handling for all operations
+- Never expose private keys in code
 
 ### ⚡ Performance
 
-- Cache token data when possible
-- Use batch requests for multiple operations
-- Implement proper loading states
+- Cache bonding curve data when monitoring multiple tokens
+- Use batch requests when possible
+- Implement proper rate limiting to avoid RPC throttling
 - Handle network timeouts gracefully
 
 ### 🎯 User Experience
 
-- Provide clear transaction feedback
-- Show estimated fees before transactions
-- Implement retry mechanisms
-- Use progressive loading for large datasets
+- Get quotes before executing trades
+- Show clear transaction feedback to users
+- Display estimated fees and price impact
+- Implement retry mechanisms for failed transactions
 
 ## Next Steps
 
 - [📝 See Example Script 1 in action](example-1.md)
 - [🛠️ Try Example Script 2](example-2.md)
-- [❓ Check the FAQ](../support/faq.md)
+- [🤖 Build a Trading Bot](creator-token-bot.md)

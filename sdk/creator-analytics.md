@@ -1,93 +1,179 @@
-# 📈 Creator Analytics & Insights
+# 📈 Bonding Curve Market Analytics
 
-This example demonstrates how to build a comprehensive analytics tool for tracking creator performance, token metrics, and generating insights for data-driven investment decisions in the Yoink ecosystem.
+This example demonstrates how to build a comprehensive analytics tool for tracking bonding curve token performance, market metrics, and generating insights for data-driven investment decisions in the Yoink ecosystem.
 
 ## Overview
 
 This tool provides:
-- Deep analytics on creator performance and engagement
-- Token price analysis and trend prediction
-- Creator ranking and comparison tools
-- Investment recommendation engine
-- Real-time alerts for creator milestones
-- Comprehensive reporting and data export
+- Deep analytics on bonding curve token performance and market trends
+- Token price analysis and curve progression tracking
+- Market ranking and comparison tools
+- Investment recommendation engine based on bonding curve metrics
+- Real-time alerts for curve completion and price milestones
+- Comprehensive reporting and data export for market research
 
 ## Prerequisites
 
-- Yoink SDK installed
-- Historical data access
-- Basic understanding of financial metrics
-- Optional: Machine learning libraries for predictions
+- Yoink SDK installed and configured
+- Access to bonding curve data
+- Basic understanding of bonding curve mechanics
+- Optional: Data visualization libraries for advanced charts
 
 ## Script Code
 
-```javascript
-import { YoinkSDK } from 'yoink-sdk';
+```typescript
+import { YoinkSDK } from '../src/yoink';
+import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import fs from 'fs';
 import path from 'path';
 
-class CreatorAnalytics {
-  constructor(config) {
-    this.yoink = new YoinkSDK({
-      network: config.network || 'mainnet-beta',
-      wallet: config.wallet,
-    });
-    
-    this.config = {
-      // Analysis Settings
-      trackingPeriod: config.trackingPeriod || 30, // days
-      updateInterval: config.updateInterval || 300000, // 5 minutes
-      minTokenAge: config.minTokenAge || 24, // hours
-      
-      // Metrics Configuration
-      metrics: {
-        price: true,
-        volume: true,
-        holders: true,
-        streams: true,
-        engagement: true,
-        social: config.includeSocial || false,
-      },
-      
-      // Alert Thresholds
-      alerts: {
-        priceChange: config.alerts?.priceChange || 20, // 20% change
-        volumeSpike: config.alerts?.volumeSpike || 300, // 300% volume increase
-        newMilestone: config.alerts?.newMilestone || true,
-        holderThreshold: config.alerts?.holderThreshold || 1000,
-      },
-      
-      // Export Settings
-      exportPath: config.exportPath || './creator-analytics',
-      autoExport: config.autoExport || true,
-      exportInterval: config.exportInterval || 3600000, // 1 hour
+interface TokenAnalytics {
+  mint: string;
+  symbol: string;
+  currentPrice: number;
+  marketCap: number;
+  totalBuyers: number;
+  isComplete: boolean;
+  
+  // Performance Metrics
+  performance: {
+    return24h: number;
+    return7d: number;
+    return30d: number;
+    direction: 'up' | 'down' | 'flat';
+  };
+  
+  // Market Metrics
+  volatility: number;
+  momentum: number;
+  liquidityScore: number;
+  buyerGrowthRate: number;
+  
+  // Curve Metrics
+  curveProgress: number; // Percentage to completion
+  timeToCompletion: number; // Estimated hours
+  averageBuySize: number;
+  priceGrowthRate: number;
+  
+  // Risk Assessment
+  riskScore: number;
+  stabilityIndex: number;
+  
+  // Historical Data
+  priceHistory: PricePoint[];
+  buyerHistory: BuyerPoint[];
+  
+  // Timestamps
+  createdAt: Date;
+  lastUpdated: Date;
+  curveAge: number; // Hours since creation
+}
+
+interface PricePoint {
+  timestamp: number;
+  price: number;
+  marketCap: number;
+  buyers: number;
+}
+
+interface BuyerPoint {
+  timestamp: number;
+  totalBuyers: number;
+  newBuyers: number;
+}
+
+interface MarketConfig {
+  rpcUrl?: string;
+  updateInterval?: number;
+  trackingPeriod?: number;
+  alerts?: {
+    priceChange: number;
+    curveCompletion: boolean;
+    volumeSpike: number;
+    buyerMilestone: number;
+  };
+  exportPath?: string;
+  autoExport?: boolean;
+}
+
+class BondingCurveAnalytics {
+  private sdk: YoinkSDK;
+  private config: MarketConfig;
+  private analytics: {
+    tokens: Map<string, TokenAnalytics>;
+    rankings: {
+      byPerformance: TokenAnalytics[];
+      byMarketCap: TokenAnalytics[];
+      byGrowth: TokenAnalytics[];
+      byVolume: TokenAnalytics[];
+      byRisk: TokenAnalytics[];
     };
-    
+    marketSummary: {
+      totalTokens: number;
+      totalMarketCap: number;
+      avgPerformance: number;
+      completedCurves: number;
+      activeCurves: number;
+      avgTimeToCompletion: number;
+    };
+    insights: any[];
+  };
+  private isRunning: boolean = false;
+  private lastUpdate: Date | null = null;
+
+  constructor(config: MarketConfig = {}) {
+    const connection = new Connection(config.rpcUrl || 'https://eclipse.lgns.net');
+    const wallet = new Wallet(); // Use your actual wallet
+    const provider = new AnchorProvider(connection, wallet, {
+      commitment: 'confirmed',
+      preflightCommitment: 'confirmed',
+    });
+
+    this.sdk = new YoinkSDK(provider);
+    this.config = {
+      updateInterval: 60000, // 1 minute
+      trackingPeriod: 168, // 7 days in hours
+      alerts: {
+        priceChange: 25,
+        curveCompletion: true,
+        volumeSpike: 300,
+        buyerMilestone: 100,
+      },
+      exportPath: './market-analytics',
+      autoExport: true,
+      ...config,
+    };
+
     this.analytics = {
-      creators: new Map(),
+      tokens: new Map(),
       rankings: {
         byPerformance: [],
-        byVolume: [],
+        byMarketCap: [],
         byGrowth: [],
-        byEngagement: [],
+        byVolume: [],
+        byRisk: [],
+      },
+      marketSummary: {
+        totalTokens: 0,
+        totalMarketCap: 0,
+        avgPerformance: 0,
+        completedCurves: 0,
+        activeCurves: 0,
+        avgTimeToCompletion: 0,
       },
       insights: [],
-      predictions: new Map(),
     };
-    
-    this.isRunning = false;
-    this.lastUpdate = null;
   }
 
   async start() {
-    console.log('📈 Starting Creator Analytics & Insights...');
+    console.log('📈 Starting Bonding Curve Market Analytics...');
     
     try {
-      await this.yoink.connect();
-      console.log('✅ Connected to Yoink platform');
+      console.log('✅ Connected to Eclipse network');
       
       // Initial data load
-      await this.loadCreatorData();
+      await this.loadMarketData();
       await this.performAnalysis();
       
       this.isRunning = true;
@@ -98,309 +184,366 @@ class CreatorAnalytics {
       }
       
     } catch (error) {
-      console.error('❌ Failed to start analytics:', error.message);
+      console.error('❌ Failed to start analytics:', error);
     }
   }
 
-  async loadCreatorData() {
-    console.log('📊 Loading creator data...');
+  async loadMarketData() {
+    console.log('📊 Loading bonding curve market data...');
     
     try {
-      // Get all active creators and their tokens
-      const creators = await this.yoink.getAllCreators();
-      
-      for (const creator of creators) {
-        await this.analyzeCreator(creator);
+      // In a real implementation, you would scan for all bonding curve tokens
+      // For now, we'll use a sample of known tokens
+      const knownTokens = [
+        'HbiDw6U515iWwHQ4edjmceT24ST7akg7z5rhXRhBac4J',
+        // Add more known token mints here
+      ];
+
+      for (const mintStr of knownTokens) {
+        try {
+          await this.analyzeToken(new PublicKey(mintStr));
+        } catch (error) {
+          console.error(`Error analyzing token ${mintStr}:`, error);
+        }
       }
       
-      console.log(`✅ Loaded data for ${creators.length} creators`);
+      console.log(`✅ Loaded data for ${this.analytics.tokens.size} tokens`);
       
     } catch (error) {
-      console.error('❌ Error loading creator data:', error.message);
+      console.error('❌ Error loading market data:', error);
     }
   }
 
-  async analyzeCreator(creator) {
+  async analyzeToken(mint: PublicKey) {
     try {
-      const creatorId = creator.address;
-      const token = await this.yoink.getToken(creator.tokenAddress);
+      const curve = await this.sdk.getBondingCurveAccount(mint);
+      if (!curve) return;
+
+      const mintStr = mint.toBase58();
+      const currentPrice = curve.getPricePerToken();
+      const marketCap = Number(curve.getMarketCapSOL()) / LAMPORTS_PER_SOL;
+      const totalBuyers = Number(curve.totalBuyers);
+      const isComplete = curve.complete;
+
+      // Get or create existing analytics
+      let existing = this.analytics.tokens.get(mintStr);
+      const createdAt = existing?.createdAt || new Date();
+      const curveAge = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60); // Hours
+
+      // Calculate performance metrics
+      const performance = this.calculatePerformance(existing, currentPrice);
+      const volatility = this.calculateVolatility(existing);
+      const momentum = this.calculateMomentum(existing, currentPrice);
+      const liquidityScore = this.calculateLiquidityScore(curve);
+      const buyerGrowthRate = this.calculateBuyerGrowthRate(existing, totalBuyers);
       
-      // Get historical data
-      const priceHistory = await this.yoink.getTokenPriceHistory(
-        creator.tokenAddress,
-        this.config.trackingPeriod
-      );
+      // Curve-specific metrics
+      const curveProgress = this.calculateCurveProgress(curve);
+      const timeToCompletion = this.estimateTimeToCompletion(curve, existing);
+      const averageBuySize = this.calculateAverageBuySize(curve);
+      const priceGrowthRate = this.calculatePriceGrowthRate(existing, currentPrice);
       
-      const volumeHistory = await this.yoink.getTokenVolumeHistory(
-        creator.tokenAddress,
-        this.config.trackingPeriod
-      );
-      
-      // Get stream data
-      const streamMetrics = await this.yoink.getCreatorStreamMetrics(creatorId);
-      
-      // Calculate analytics
-      const analytics = {
-        // Basic Info
-        creatorId,
-        name: creator.name,
-        platform: creator.platform,
-        tokenAddress: creator.tokenAddress,
+      // Risk assessment
+      const riskScore = this.calculateRiskScore(curve, existing);
+      const stabilityIndex = this.calculateStabilityIndex(existing);
+
+      // Update price and buyer history
+      const priceHistory = existing?.priceHistory || [];
+      const buyerHistory = existing?.buyerHistory || [];
+
+      priceHistory.push({
+        timestamp: Date.now(),
+        price: currentPrice,
+        marketCap,
+        buyers: totalBuyers,
+      });
+
+      buyerHistory.push({
+        timestamp: Date.now(),
+        totalBuyers,
+        newBuyers: existing ? Math.max(0, totalBuyers - existing.totalBuyers) : 0,
+      });
+
+      // Keep only recent history (last 7 days)
+      const cutoff = Date.now() - (7 * 24 * 60 * 60 * 1000);
+      const recentPriceHistory = priceHistory.filter(p => p.timestamp > cutoff);
+      const recentBuyerHistory = buyerHistory.filter(b => b.timestamp > cutoff);
+
+      const analytics: TokenAnalytics = {
+        mint: mintStr,
+        symbol: `TOKEN_${mintStr.slice(0, 8)}`,
+        currentPrice,
+        marketCap,
+        totalBuyers,
+        isComplete,
         
-        // Current Metrics
-        currentPrice: token.price,
-        marketCap: token.marketCap,
-        totalSupply: token.totalSupply,
-        holders: token.holders,
-        volume24h: token.volume24h,
+        performance,
+        volatility,
+        momentum,
+        liquidityScore,
+        buyerGrowthRate,
         
-        // Performance Metrics
-        performance: this.calculatePerformance(priceHistory),
-        volatility: this.calculateVolatility(priceHistory),
-        momentum: this.calculateMomentum(priceHistory),
+        curveProgress,
+        timeToCompletion,
+        averageBuySize,
+        priceGrowthRate,
         
-        // Volume Analysis
-        volumeMetrics: this.analyzeVolume(volumeHistory),
-        liquidityScore: this.calculateLiquidityScore(token),
+        riskScore,
+        stabilityIndex,
         
-        // Stream Analytics
-        streamMetrics: {
-          averageViewers: streamMetrics.averageViewers,
-          streamHours: streamMetrics.totalHours,
-          peakViewers: streamMetrics.peakViewers,
-          consistency: streamMetrics.streamDays / this.config.trackingPeriod,
-          engagement: streamMetrics.engagementRate,
-        },
+        priceHistory: recentPriceHistory,
+        buyerHistory: recentBuyerHistory,
         
-        // Growth Metrics
-        holderGrowth: this.calculateHolderGrowth(creator),
-        priceGrowth: this.calculatePriceGrowth(priceHistory),
-        volumeGrowth: this.calculateVolumeGrowth(volumeHistory),
-        
-        // Risk Assessment
-        riskScore: this.calculateRiskScore(token, streamMetrics),
-        stabilityIndex: this.calculateStabilityIndex(priceHistory),
-        
-        // Timestamps
+        createdAt,
         lastUpdated: new Date(),
-        createdAt: creator.createdAt,
-        tokenAge: this.calculateTokenAge(creator.createdAt),
+        curveAge,
       };
-      
-      this.analytics.creators.set(creatorId, analytics);
-      
+
+      this.analytics.tokens.set(mintStr, analytics);
+
     } catch (error) {
-      console.error(`❌ Error analyzing creator ${creator.name}:`, error.message);
+      console.error(`❌ Error analyzing token ${mint.toBase58()}:`, error);
     }
   }
 
-  calculatePerformance(priceHistory) {
-    if (priceHistory.length < 2) return { return: 0, change: 0 };
+  calculatePerformance(existing: TokenAnalytics | undefined, currentPrice: number) {
+    if (!existing || existing.priceHistory.length === 0) {
+      return { return24h: 0, return7d: 0, return30d: 0, direction: 'flat' as const };
+    }
+
+    const now = Date.now();
+    const day = 24 * 60 * 60 * 1000;
     
-    const firstPrice = priceHistory[0].price;
-    const lastPrice = priceHistory[priceHistory.length - 1].price;
-    const change = lastPrice - firstPrice;
-    const returnPercent = (change / firstPrice) * 100;
-    
-    return {
-      return: returnPercent,
-      change: change,
-      absolute: Math.abs(returnPercent),
-      direction: change > 0 ? 'up' : change < 0 ? 'down' : 'flat',
-    };
+    // Find prices at different intervals
+    const price24h = this.findPriceAtTime(existing.priceHistory, now - day);
+    const price7d = this.findPriceAtTime(existing.priceHistory, now - (7 * day));
+    const price30d = this.findPriceAtTime(existing.priceHistory, now - (30 * day));
+
+    const return24h = price24h ? ((currentPrice - price24h) / price24h) * 100 : 0;
+    const return7d = price7d ? ((currentPrice - price7d) / price7d) * 100 : 0;
+    const return30d = price30d ? ((currentPrice - price30d) / price30d) * 100 : 0;
+
+    const direction = return24h > 1 ? 'up' : return24h < -1 ? 'down' : 'flat';
+
+    return { return24h, return7d, return30d, direction };
   }
 
-  calculateVolatility(priceHistory) {
-    if (priceHistory.length < 2) return 0;
+  findPriceAtTime(history: PricePoint[], targetTime: number): number | null {
+    const closest = history.reduce((prev, curr) => 
+      Math.abs(curr.timestamp - targetTime) < Math.abs(prev.timestamp - targetTime) ? curr : prev
+    );
     
+    return Math.abs(closest.timestamp - targetTime) < (2 * 60 * 60 * 1000) ? closest.price : null;
+  }
+
+  calculateVolatility(existing: TokenAnalytics | undefined): number {
+    if (!existing || existing.priceHistory.length < 2) return 0;
+
+    const prices = existing.priceHistory.slice(-24); // Last 24 data points
+    if (prices.length < 2) return 0;
+
     const returns = [];
-    for (let i = 1; i < priceHistory.length; i++) {
-      const dailyReturn = (priceHistory[i].price - priceHistory[i-1].price) / priceHistory[i-1].price;
+    for (let i = 1; i < prices.length; i++) {
+      const dailyReturn = (prices[i].price - prices[i-1].price) / prices[i-1].price;
       returns.push(dailyReturn);
     }
-    
+
     const mean = returns.reduce((sum, r) => sum + r, 0) / returns.length;
     const variance = returns.reduce((sum, r) => sum + Math.pow(r - mean, 2), 0) / returns.length;
-    
-    return Math.sqrt(variance) * 100; // Convert to percentage
+
+    return Math.sqrt(variance) * 100;
   }
 
-  calculateMomentum(priceHistory) {
-    if (priceHistory.length < 7) return 0;
-    
-    const recent = priceHistory.slice(-7); // Last 7 days
-    const older = priceHistory.slice(-14, -7); // Previous 7 days
-    
+  calculateMomentum(existing: TokenAnalytics | undefined, currentPrice: number): number {
+    if (!existing || existing.priceHistory.length < 10) return 0;
+
+    const recent = existing.priceHistory.slice(-5);
+    const older = existing.priceHistory.slice(-10, -5);
+
     const recentAvg = recent.reduce((sum, p) => sum + p.price, 0) / recent.length;
     const olderAvg = older.reduce((sum, p) => sum + p.price, 0) / older.length;
-    
+
     return ((recentAvg - olderAvg) / olderAvg) * 100;
   }
 
-  analyzeVolume(volumeHistory) {
-    if (volumeHistory.length === 0) return { average: 0, trend: 'flat', spikes: 0 };
+  calculateLiquidityScore(curve: any): number {
+    const marketCap = Number(curve.getMarketCapSOL()) / LAMPORTS_PER_SOL;
+    const totalBuyers = Number(curve.totalBuyers);
     
-    const volumes = volumeHistory.map(v => v.volume);
-    const average = volumes.reduce((sum, v) => sum + v, 0) / volumes.length;
+    // Score based on market cap and buyer diversity
+    const marketCapScore = Math.min(100, marketCap * 2); // Higher market cap = better liquidity
+    const buyerScore = Math.min(100, totalBuyers / 5); // More buyers = better liquidity
     
-    // Calculate trend
-    const firstHalf = volumes.slice(0, Math.floor(volumes.length / 2));
-    const secondHalf = volumes.slice(Math.floor(volumes.length / 2));
-    
-    const firstAvg = firstHalf.reduce((sum, v) => sum + v, 0) / firstHalf.length;
-    const secondAvg = secondHalf.reduce((sum, v) => sum + v, 0) / secondHalf.length;
-    
-    const trend = secondAvg > firstAvg * 1.2 ? 'increasing' : 
-                  secondAvg < firstAvg * 0.8 ? 'decreasing' : 'stable';
-    
-    // Count volume spikes (3x average)
-    const spikes = volumes.filter(v => v > average * 3).length;
-    
-    return {
-      average,
-      current: volumes[volumes.length - 1],
-      trend,
-      spikes,
-      consistency: this.calculateVolumeConsistency(volumes),
-    };
+    return (marketCapScore + buyerScore) / 2;
   }
 
-  calculateVolumeConsistency(volumes) {
-    if (volumes.length < 2) return 0;
+  calculateBuyerGrowthRate(existing: TokenAnalytics | undefined, currentBuyers: number): number {
+    if (!existing || existing.buyerHistory.length < 2) return 0;
+
+    const hourAgo = Date.now() - (60 * 60 * 1000);
+    const previousBuyers = this.findBuyersAtTime(existing.buyerHistory, hourAgo);
     
-    const average = volumes.reduce((sum, v) => sum + v, 0) / volumes.length;
-    const deviations = volumes.map(v => Math.abs(v - average) / average);
-    const avgDeviation = deviations.reduce((sum, d) => sum + d, 0) / deviations.length;
+    if (!previousBuyers) return 0;
     
-    return Math.max(0, 100 - (avgDeviation * 100)); // Higher is more consistent
+    return previousBuyers > 0 ? ((currentBuyers - previousBuyers) / previousBuyers) * 100 : 0;
   }
 
-  calculateLiquidityScore(token) {
-    // Simplified liquidity scoring based on volume and holder count
-    const volumeScore = Math.min(100, (token.volume24h / token.marketCap) * 1000);
-    const holderScore = Math.min(100, token.holders / 10);
+  findBuyersAtTime(history: BuyerPoint[], targetTime: number): number | null {
+    const closest = history.reduce((prev, curr) => 
+      Math.abs(curr.timestamp - targetTime) < Math.abs(prev.timestamp - targetTime) ? curr : prev
+    );
     
-    return (volumeScore + holderScore) / 2;
+    return Math.abs(closest.timestamp - targetTime) < (2 * 60 * 60 * 1000) ? closest.totalBuyers : null;
   }
 
-  calculateHolderGrowth(creator) {
-    // This would require historical holder data
-    // For now, return a simplified calculation
-    const daysActive = this.calculateTokenAge(creator.createdAt);
-    return daysActive > 0 ? creator.holders / daysActive : 0;
+  calculateCurveProgress(curve: any): number {
+    if (curve.complete) return 100;
+    
+    const currentMarketCap = Number(curve.getMarketCapSOL()) / LAMPORTS_PER_SOL;
+    // Assuming curves complete around 85-90 SOL market cap
+    const completionMarketCap = 85;
+    
+    return Math.min(100, (currentMarketCap / completionMarketCap) * 100);
   }
 
-  calculatePriceGrowth(priceHistory) {
-    if (priceHistory.length < 2) return 0;
+  estimateTimeToCompletion(curve: any, existing: TokenAnalytics | undefined): number {
+    if (curve.complete) return 0;
+    if (!existing || existing.priceHistory.length < 5) return -1; // Not enough data
+
+    const currentProgress = this.calculateCurveProgress(curve);
+    const remainingProgress = 100 - currentProgress;
     
-    const periods = [1, 7, 30]; // 1 day, 1 week, 1 month
-    const growth = {};
+    // Calculate average progress per hour
+    const hoursOfData = Math.min(24, existing.priceHistory.length);
+    const progressGained = this.calculateProgressGained(existing, hoursOfData);
+    const avgProgressPerHour = progressGained / hoursOfData;
     
-    periods.forEach(period => {
-      if (priceHistory.length > period) {
-        const currentPrice = priceHistory[priceHistory.length - 1].price;
-        const pastPrice = priceHistory[priceHistory.length - 1 - period].price;
-        growth[`${period}d`] = ((currentPrice - pastPrice) / pastPrice) * 100;
-      }
-    });
-    
-    return growth;
+    return avgProgressPerHour > 0 ? remainingProgress / avgProgressPerHour : -1;
   }
 
-  calculateVolumeGrowth(volumeHistory) {
-    if (volumeHistory.length < 7) return 0;
+  calculateProgressGained(existing: TokenAnalytics, hours: number): number {
+    if (existing.priceHistory.length < 2) return 0;
     
-    const recent = volumeHistory.slice(-7);
-    const previous = volumeHistory.slice(-14, -7);
+    const recent = existing.priceHistory[existing.priceHistory.length - 1];
+    const past = existing.priceHistory[Math.max(0, existing.priceHistory.length - hours)];
     
-    const recentTotal = recent.reduce((sum, v) => sum + v.volume, 0);
-    const previousTotal = previous.reduce((sum, v) => sum + v.volume, 0);
+    const recentProgress = this.calculateProgressFromMarketCap(recent.marketCap);
+    const pastProgress = this.calculateProgressFromMarketCap(past.marketCap);
     
-    return previousTotal > 0 ? ((recentTotal - previousTotal) / previousTotal) * 100 : 0;
+    return recentProgress - pastProgress;
   }
 
-  calculateRiskScore(token, streamMetrics) {
+  calculateProgressFromMarketCap(marketCap: number): number {
+    const completionMarketCap = 85;
+    return Math.min(100, (marketCap / completionMarketCap) * 100);
+  }
+
+  calculateAverageBuySize(curve: any): number {
+    const totalBuyers = Number(curve.totalBuyers);
+    const marketCap = Number(curve.getMarketCapSOL()) / LAMPORTS_PER_SOL;
+    
+    return totalBuyers > 0 ? marketCap / totalBuyers : 0;
+  }
+
+  calculatePriceGrowthRate(existing: TokenAnalytics | undefined, currentPrice: number): number {
+    if (!existing || existing.priceHistory.length < 2) return 0;
+
+    const hourAgo = Date.now() - (60 * 60 * 1000);
+    const previousPrice = this.findPriceAtTime(existing.priceHistory, hourAgo);
+    
+    if (!previousPrice) return 0;
+    
+    return ((currentPrice - previousPrice) / previousPrice) * 100;
+  }
+
+  calculateRiskScore(curve: any, existing: TokenAnalytics | undefined): number {
     let riskScore = 0;
     
-    // Low holder count increases risk
-    if (token.holders < 100) riskScore += 30;
-    else if (token.holders < 500) riskScore += 15;
+    const totalBuyers = Number(curve.totalBuyers);
+    const marketCap = Number(curve.getMarketCapSOL()) / LAMPORTS_PER_SOL;
     
-    // Low liquidity increases risk
-    if (token.volume24h < token.marketCap * 0.01) riskScore += 25;
+    // Low buyer count increases risk
+    if (totalBuyers < 10) riskScore += 40;
+    else if (totalBuyers < 25) riskScore += 20;
+    else if (totalBuyers < 50) riskScore += 10;
     
-    // Irregular streaming increases risk
-    if (streamMetrics.streamDays < this.config.trackingPeriod * 0.5) riskScore += 20;
+    // Low market cap increases risk
+    if (marketCap < 1) riskScore += 30;
+    else if (marketCap < 5) riskScore += 15;
     
-    // High price volatility increases risk
-    // This would need the volatility calculation result
+    // High volatility increases risk
+    if (existing) {
+      if (existing.volatility > 50) riskScore += 20;
+      else if (existing.volatility > 25) riskScore += 10;
+    }
+    
+    // Age factor - very new tokens are riskier
+    if (existing && existing.curveAge < 1) riskScore += 15;
+    else if (existing && existing.curveAge < 6) riskScore += 8;
     
     return Math.min(100, riskScore);
   }
 
-  calculateStabilityIndex(priceHistory) {
-    if (priceHistory.length < 7) return 0;
+  calculateStabilityIndex(existing: TokenAnalytics | undefined): number {
+    if (!existing) return 0;
     
-    const volatility = this.calculateVolatility(priceHistory);
-    return Math.max(0, 100 - volatility); // Higher is more stable
-  }
-
-  calculateTokenAge(createdAt) {
-    const now = new Date();
-    const created = new Date(createdAt);
-    return Math.floor((now - created) / (1000 * 60 * 60 * 24)); // Days
+    const volatilityScore = Math.max(0, 100 - existing.volatility * 2);
+    const ageScore = Math.min(100, existing.curveAge * 4); // More stable as it ages
+    const buyerScore = Math.min(100, existing.totalBuyers * 2);
+    
+    return (volatilityScore + ageScore + buyerScore) / 3;
   }
 
   async performAnalysis() {
-    console.log('🔍 Performing comprehensive analysis...');
+    console.log('🔍 Performing comprehensive market analysis...');
     
     // Generate rankings
     this.generateRankings();
     
-    // Generate insights
+    // Generate market insights
     this.generateInsights();
     
-    // Generate predictions (simplified)
-    this.generatePredictions();
+    // Update market summary
+    this.updateMarketSummary();
     
     this.lastUpdate = new Date();
     console.log('✅ Analysis complete');
   }
 
   generateRankings() {
-    const creators = Array.from(this.analytics.creators.values());
+    const tokens = Array.from(this.analytics.tokens.values());
     
-    // Performance ranking
-    this.analytics.rankings.byPerformance = creators
-      .sort((a, b) => b.performance.return - a.performance.return)
+    // Performance ranking (24h returns)
+    this.analytics.rankings.byPerformance = tokens
+      .sort((a, b) => b.performance.return24h - a.performance.return24h)
       .slice(0, 20);
     
-    // Volume ranking
-    this.analytics.rankings.byVolume = creators
-      .sort((a, b) => b.volume24h - a.volume24h)
+    // Market cap ranking
+    this.analytics.rankings.byMarketCap = tokens
+      .sort((a, b) => b.marketCap - a.marketCap)
       .slice(0, 20);
     
-    // Growth ranking (holder growth)
-    this.analytics.rankings.byGrowth = creators
-      .sort((a, b) => b.holderGrowth - a.holderGrowth)
+    // Growth ranking (buyer growth rate)
+    this.analytics.rankings.byGrowth = tokens
+      .sort((a, b) => b.buyerGrowthRate - a.buyerGrowthRate)
       .slice(0, 20);
     
-    // Engagement ranking
-    this.analytics.rankings.byEngagement = creators
-      .sort((a, b) => b.streamMetrics.engagement - a.streamMetrics.engagement)
+    // Risk ranking (lowest risk first)
+    this.analytics.rankings.byRisk = tokens
+      .sort((a, b) => a.riskScore - b.riskScore)
       .slice(0, 20);
   }
 
   generateInsights() {
-    const creators = Array.from(this.analytics.creators.values());
+    const tokens = Array.from(this.analytics.tokens.values());
     this.analytics.insights = [];
     
     // Market trends
-    const avgPerformance = creators.reduce((sum, c) => sum + c.performance.return, 0) / creators.length;
+    const avgPerformance = tokens.reduce((sum, t) => sum + t.performance.return24h, 0) / tokens.length;
     this.analytics.insights.push({
       type: 'market_trend',
       title: 'Market Performance',
-      message: `Average creator token performance: ${avgPerformance.toFixed(2)}%`,
+      message: `Average 24h return: ${avgPerformance.toFixed(2)}%`,
       sentiment: avgPerformance > 0 ? 'positive' : 'negative',
     });
     
@@ -409,88 +552,78 @@ class CreatorAnalytics {
     if (topPerformer) {
       this.analytics.insights.push({
         type: 'top_performer',
-        title: 'Best Performing Creator',
-        message: `${topPerformer.name} leading with ${topPerformer.performance.return.toFixed(2)}% return`,
-        creator: topPerformer.creatorId,
+        title: 'Best Performing Token',
+        message: `${topPerformer.symbol} leading with ${topPerformer.performance.return24h.toFixed(2)}% return`,
+        token: topPerformer.mint,
         sentiment: 'positive',
       });
     }
     
-    // Volume leaders
-    const volumeLeader = this.analytics.rankings.byVolume[0];
-    if (volumeLeader) {
+    // Curve completion alerts
+    const nearCompletion = tokens.filter(t => t.curveProgress > 80 && !t.isComplete);
+    if (nearCompletion.length > 0) {
       this.analytics.insights.push({
-        type: 'volume_leader',
-        title: 'Highest Volume',
-        message: `${volumeLeader.name} with ${volumeLeader.volume24h.toFixed(4)} SOL in 24h volume`,
-        creator: volumeLeader.creatorId,
+        type: 'completion_alert',
+        title: 'Curves Near Completion',
+        message: `${nearCompletion.length} tokens approaching curve completion`,
         sentiment: 'neutral',
       });
     }
     
-    // Risk warnings
-    const highRiskCreators = creators.filter(c => c.riskScore > 70);
-    if (highRiskCreators.length > 0) {
+    // High risk warnings
+    const highRiskTokens = tokens.filter(t => t.riskScore > 70);
+    if (highRiskTokens.length > 0) {
       this.analytics.insights.push({
         type: 'risk_warning',
         title: 'High Risk Alert',
-        message: `${highRiskCreators.length} creators showing high risk indicators`,
+        message: `${highRiskTokens.length} tokens showing high risk indicators`,
         sentiment: 'negative',
+      });
+    }
+    
+    // Momentum analysis
+    const strongMomentum = tokens.filter(t => Math.abs(t.momentum) > 15);
+    if (strongMomentum.length > 0) {
+      this.analytics.insights.push({
+        type: 'momentum_alert',
+        title: 'Strong Momentum Detected',
+        message: `${strongMomentum.length} tokens showing significant momentum shifts`,
+        sentiment: 'neutral',
       });
     }
   }
 
-  generatePredictions() {
-    // Simplified prediction algorithm
-    const creators = Array.from(this.analytics.creators.values());
+  updateMarketSummary() {
+    const tokens = Array.from(this.analytics.tokens.values());
     
-    creators.forEach(creator => {
-      let prediction = 'neutral';
-      let confidence = 50;
-      
-      // Momentum-based prediction
-      if (creator.momentum > 10 && creator.streamMetrics.consistency > 0.7) {
-        prediction = 'bullish';
-        confidence += 20;
-      } else if (creator.momentum < -10 || creator.streamMetrics.consistency < 0.3) {
-        prediction = 'bearish';
-        confidence += 15;
-      }
-      
-      // Volume consideration
-      if (creator.volumeMetrics.trend === 'increasing') {
-        confidence += 10;
-      }
-      
-      // Risk adjustment
-      if (creator.riskScore > 70) {
-        confidence -= 20;
-      }
-      
-      this.analytics.predictions.set(creator.creatorId, {
-        prediction,
-        confidence: Math.max(0, Math.min(100, confidence)),
-        timeframe: '7d',
-        factors: {
-          momentum: creator.momentum,
-          volume: creator.volumeMetrics.trend,
-          consistency: creator.streamMetrics.consistency,
-          risk: creator.riskScore,
-        },
-      });
-    });
+    this.analytics.marketSummary = {
+      totalTokens: tokens.length,
+      totalMarketCap: tokens.reduce((sum, t) => sum + t.marketCap, 0),
+      avgPerformance: tokens.reduce((sum, t) => sum + t.performance.return24h, 0) / tokens.length,
+      completedCurves: tokens.filter(t => t.isComplete).length,
+      activeCurves: tokens.filter(t => !t.isComplete).length,
+      avgTimeToCompletion: this.calculateAvgTimeToCompletion(tokens),
+    };
+  }
+
+  calculateAvgTimeToCompletion(tokens: TokenAnalytics[]): number {
+    const activeTokens = tokens.filter(t => !t.isComplete && t.timeToCompletion > 0);
+    if (activeTokens.length === 0) return 0;
+    
+    return activeTokens.reduce((sum, t) => sum + t.timeToCompletion, 0) / activeTokens.length;
   }
 
   async startContinuousAnalysis() {
     while (this.isRunning) {
       try {
-        await this.loadCreatorData();
+        await this.loadMarketData();
         await this.performAnalysis();
         this.displayDashboard();
+        await this.checkAlerts();
         
-        await this.sleep(this.config.updateInterval);
+        await this.sleep(this.config.updateInterval!);
       } catch (error) {
-        console.error('❌ Analysis error:', error.message);
+        console.error('❌ Analysis error:', error);
         await this.sleep(30000);
       }
     }
@@ -499,123 +632,160 @@ class CreatorAnalytics {
   startAutoExport() {
     setInterval(() => {
       this.exportAnalytics();
-    }, this.config.exportInterval);
+    }, 3600000); // Export every hour
+  }
+
+  async checkAlerts() {
+    const tokens = Array.from(this.analytics.tokens.values());
+    
+    tokens.forEach(token => {
+      const { priceChange, curveCompletion, buyerMilestone } = this.config.alerts!;
+      
+      // Price change alerts
+      if (Math.abs(token.performance.return24h) >= priceChange) {
+        const direction = token.performance.return24h > 0 ? 'gained' : 'lost';
+        this.sendAlert(`🚨 ${token.symbol} has ${direction} ${Math.abs(token.performance.return24h).toFixed(2)}% in 24h`);
+      }
+      
+      // Curve completion alerts
+      if (curveCompletion && token.isComplete) {
+        this.sendAlert(`✅ ${token.symbol} bonding curve completed! Final market cap: ${token.marketCap.toFixed(2)} SOL`);
+      }
+      
+      // Buyer milestone alerts
+      if (token.totalBuyers >= buyerMilestone && token.totalBuyers < buyerMilestone + 10) {
+        this.sendAlert(`👥 ${token.symbol} reached ${token.totalBuyers} buyers milestone!`);
+      }
+    });
+  }
+
+  sendAlert(message: string) {
+    console.log(`🔔 ALERT: ${message}`);
+    // Here you could integrate with Discord, Telegram, email, etc.
   }
 
   displayDashboard() {
     console.clear();
-    console.log('📈 YOINK CREATOR ANALYTICS DASHBOARD');
-    console.log('===================================');
+    console.log('📈 YOINK BONDING CURVE MARKET ANALYTICS');
+    console.log('======================================');
     console.log(`Last Update: ${this.lastUpdate?.toLocaleString()}`);
-    console.log(`Tracking ${this.analytics.creators.size} creators`);
+    console.log(`Tracking ${this.analytics.tokens.size} bonding curve tokens`);
+    console.log();
+    
+    // Market summary
+    console.log('📊 MARKET SUMMARY');
+    console.log('-----------------');
+    console.log(`Total Market Cap: ${this.analytics.marketSummary.totalMarketCap.toFixed(2)} SOL`);
+    console.log(`Average Performance: ${this.analytics.marketSummary.avgPerformance > 0 ? '+' : ''}${this.analytics.marketSummary.avgPerformance.toFixed(2)}%`);
+    console.log(`Active Curves: ${this.analytics.marketSummary.activeCurves}`);
+    console.log(`Completed Curves: ${this.analytics.marketSummary.completedCurves}`);
+    if (this.analytics.marketSummary.avgTimeToCompletion > 0) {
+      console.log(`Avg Time to Completion: ${this.analytics.marketSummary.avgTimeToCompletion.toFixed(1)}h`);
+    }
     console.log();
     
     // Top performers
-    console.log('🏆 TOP PERFORMERS (24H):');
+    console.log('🏆 TOP PERFORMERS (24H)');
     console.log('------------------------');
-    this.analytics.rankings.byPerformance.slice(0, 5).forEach((creator, index) => {
-      const trend = creator.performance.direction === 'up' ? '📈' : 
-                   creator.performance.direction === 'down' ? '📉' : '➡️';
-      console.log(`${index + 1}. ${trend} ${creator.name}`);
-      console.log(`   Return: ${creator.performance.return > 0 ? '+' : ''}${creator.performance.return.toFixed(2)}%`);
-      console.log(`   Volume: ${creator.volume24h.toFixed(4)} SOL`);
-      console.log(`   Risk: ${creator.riskScore.toFixed(0)}/100`);
+    this.analytics.rankings.byPerformance.slice(0, 5).forEach((token, index) => {
+      const trend = token.performance.direction === 'up' ? '📈' : 
+                   token.performance.direction === 'down' ? '📉' : '➡️';
+      const status = token.isComplete ? '✅' : '🔄';
+      
+      console.log(`${index + 1}. ${trend} ${status} ${token.symbol}`);
+      console.log(`   24h: ${token.performance.return24h > 0 ? '+' : ''}${token.performance.return24h.toFixed(2)}%`);
+      console.log(`   Market Cap: ${token.marketCap.toFixed(2)} SOL`);
+      console.log(`   Progress: ${token.curveProgress.toFixed(1)}%`);
+      console.log(`   Buyers: ${token.totalBuyers}`);
+      console.log(`   Risk: ${token.riskScore.toFixed(0)}/100`);
       console.log();
     });
     
     // Key insights
-    console.log('💡 KEY INSIGHTS:');
-    console.log('----------------');
-    this.analytics.insights.slice(0, 3).forEach(insight => {
+    console.log('💡 KEY INSIGHTS');
+    console.log('---------------');
+    this.analytics.insights.slice(0, 4).forEach(insight => {
       const emoji = insight.sentiment === 'positive' ? '✅' : 
                    insight.sentiment === 'negative' ? '⚠️' : 'ℹ️';
       console.log(`${emoji} ${insight.title}: ${insight.message}`);
     });
     console.log();
     
-    // Market summary
-    const creators = Array.from(this.analytics.creators.values());
-    const avgReturn = creators.reduce((sum, c) => sum + c.performance.return, 0) / creators.length;
-    const positiveCreators = creators.filter(c => c.performance.return > 0).length;
+    // Curve status breakdown
+    const tokens = Array.from(this.analytics.tokens.values());
+    const progressRanges = [
+      { range: '0-25%', count: tokens.filter(t => t.curveProgress < 25).length },
+      { range: '25-50%', count: tokens.filter(t => t.curveProgress >= 25 && t.curveProgress < 50).length },
+      { range: '50-75%', count: tokens.filter(t => t.curveProgress >= 50 && t.curveProgress < 75).length },
+      { range: '75-99%', count: tokens.filter(t => t.curveProgress >= 75 && t.curveProgress < 100).length },
+      { range: 'Complete', count: tokens.filter(t => t.isComplete).length },
+    ];
     
-    console.log('📊 MARKET SUMMARY:');
-    console.log('------------------');
-    console.log(`Average Return: ${avgReturn > 0 ? '+' : ''}${avgReturn.toFixed(2)}%`);
-    console.log(`Positive: ${positiveCreators}/${creators.length} (${(positiveCreators/creators.length*100).toFixed(1)}%)`);
-    console.log(`Total Volume: ${creators.reduce((sum, c) => sum + c.volume24h, 0).toFixed(2)} SOL`);
+    console.log('📈 CURVE PROGRESS DISTRIBUTION');
+    console.log('------------------------------');
+    progressRanges.forEach(({ range, count }) => {
+      if (count > 0) {
+        console.log(`${range}: ${count} tokens`);
+      }
+    });
   }
 
   async exportAnalytics() {
     try {
       const exportData = {
         timestamp: new Date().toISOString(),
-        summary: {
-          totalCreators: this.analytics.creators.size,
-          lastUpdate: this.lastUpdate,
-          marketSummary: this.generateMarketSummary(),
-        },
-        creators: Array.from(this.analytics.creators.values()),
+        marketSummary: this.analytics.marketSummary,
+        tokens: Array.from(this.analytics.tokens.values()),
         rankings: this.analytics.rankings,
         insights: this.analytics.insights,
-        predictions: Object.fromEntries(this.analytics.predictions),
+        config: {
+          updateInterval: this.config.updateInterval,
+          trackingPeriod: this.config.trackingPeriod,
+        }
       };
       
-      const filename = `creator-analytics-${new Date().toISOString().split('T')[0]}.json`;
-      const filepath = path.join(this.config.exportPath, filename);
+      const filename = `bonding-curve-analytics-${new Date().toISOString().split('T')[0]}.json`;
+      const filepath = path.join(this.config.exportPath!, filename);
       
-      if (!fs.existsSync(this.config.exportPath)) {
-        fs.mkdirSync(this.config.exportPath, { recursive: true });
+      if (!fs.existsSync(this.config.exportPath!)) {
+        fs.mkdirSync(this.config.exportPath!, { recursive: true });
       }
       
       fs.writeFileSync(filepath, JSON.stringify(exportData, null, 2));
       console.log(`📁 Analytics exported to: ${filepath}`);
       
     } catch (error) {
-      console.error('❌ Export failed:', error.message);
+      console.error('❌ Export failed:', error);
     }
   }
 
-  generateMarketSummary() {
-    const creators = Array.from(this.analytics.creators.values());
-    
-    return {
-      totalCreators: creators.length,
-      avgReturn: creators.reduce((sum, c) => sum + c.performance.return, 0) / creators.length,
-      totalVolume: creators.reduce((sum, c) => sum + c.volume24h, 0),
-      totalMarketCap: creators.reduce((sum, c) => sum + c.marketCap, 0),
-      avgRiskScore: creators.reduce((sum, c) => sum + c.riskScore, 0) / creators.length,
-      positivePerformers: creators.filter(c => c.performance.return > 0).length,
-    };
-  }
-
   stop() {
-    console.log('🛑 Stopping creator analytics...');
+    console.log('🛑 Stopping bonding curve analytics...');
     this.isRunning = false;
     this.exportAnalytics(); // Final export
   }
 
-  sleep(ms) {
+  sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 }
 
 // Usage Example
 async function main() {
-  const analytics = new CreatorAnalytics({
-    network: 'mainnet-beta',
-    wallet: yourWalletAdapter,
-    trackingPeriod: 30, // 30 days of data
-    updateInterval: 300000, // 5 minutes
+  const analytics = new BondingCurveAnalytics({
+    rpcUrl: 'https://eclipse.lgns.net',
+    updateInterval: 120000, // 2 minutes
+    trackingPeriod: 168, // 7 days
     
     alerts: {
-      priceChange: 25, // Alert on 25% price changes
-      volumeSpike: 400, // Alert on 400% volume spikes
-      holderThreshold: 500, // Alert when reaching 500 holders
+      priceChange: 30, // Alert on 30% price changes
+      curveCompletion: true, // Alert on curve completion
+      volumeSpike: 500, // Alert on 500% volume spikes
+      buyerMilestone: 100, // Alert every 100 buyers
     },
     
-    exportPath: './analytics-exports',
+    exportPath: './market-analytics',
     autoExport: true,
-    exportInterval: 1800000, // Export every 30 minutes
   });
   
   await analytics.start();
@@ -627,116 +797,144 @@ async function main() {
   });
 }
 
-// Run the analytics dashboard
+// Run the market analytics dashboard
 main().catch(console.error);
 ```
 
 ## Features
 
-### 📊 Comprehensive Analytics
-- Creator performance tracking
-- Token price and volume analysis
-- Holder growth metrics
-- Stream engagement analytics
+### 📊 Comprehensive Market Analytics
+- Real-time bonding curve token performance tracking
+- Market cap and price analysis
+- Buyer growth and momentum metrics
+- Curve progression and completion tracking
 
 ### 🏆 Rankings & Comparisons
-- Performance leaderboards
-- Volume rankings
-- Growth metrics
-- Risk assessments
+- Performance leaderboards by 24h returns
+- Market cap rankings
+- Growth rate comparisons
+- Risk assessment rankings
 
 ### 🔮 Predictive Insights
-- Momentum analysis
-- Trend predictions
-- Risk scoring
-- Market sentiment
+- Momentum analysis and trend detection
+- Time-to-completion estimates for active curves
+- Risk scoring and stability analysis
+- Market sentiment indicators
 
-### 📈 Advanced Metrics
-- Volatility calculations
-- Liquidity scoring
-- Stability indices
-- Correlation analysis
+### 📈 Advanced Bonding Curve Metrics
+- Curve progress percentage tracking
+- Average buy size analysis
+- Price growth rate calculations
+- Buyer acquisition rate monitoring
 
-### 📁 Data Export
-- JSON data exports
-- Historical analytics
-- Custom reporting
-- Automated backups
+### 📁 Data Export & Alerts
+- JSON data exports with full analytics
+- Real-time alerts for price changes and milestones
+- Historical data tracking
+- Automated reporting
 
 ## Configuration Options
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `trackingPeriod` | Number | `30` | Days of historical data |
-| `updateInterval` | Number | `300000` | Update frequency (ms) |
-| `alerts.priceChange` | Number | `20` | Price change alert (%) |
-| `alerts.volumeSpike` | Number | `300` | Volume spike alert (%) |
-| `exportPath` | String | `'./creator-analytics'` | Export directory |
+| `rpcUrl` | String | `'https://eclipse.lgns.net'` | Solana RPC endpoint |
+| `updateInterval` | Number | `60000` | Update frequency (ms) |
+| `trackingPeriod` | Number | `168` | Hours of historical data |
+| `alerts.priceChange` | Number | `25` | Price change alert (%) |
+| `alerts.curveCompletion` | Boolean | `true` | Alert on curve completion |
+| `alerts.buyerMilestone` | Number | `100` | Buyer milestone alerts |
+| `exportPath` | String | `'./market-analytics'` | Export directory |
 | `autoExport` | Boolean | `true` | Enable auto exports |
 
 ## Running the Script
 
 1. **Install dependencies**:
    ```bash
-   npm install yoink-sdk @solana/web3.js
+   npm install @solana/web3.js @coral-xyz/anchor
    ```
 
 2. **Configure analytics**:
-   ```javascript
-   const analytics = new CreatorAnalytics({
-     trackingPeriod: 45,
-     alerts: { priceChange: 30 }
+   ```typescript
+   const analytics = new BondingCurveAnalytics({
+     updateInterval: 60000, // 1 minute updates
+     alerts: { 
+       priceChange: 25,
+       curveCompletion: true 
+     }
    });
    ```
 
 3. **Start the dashboard**:
    ```bash
-   node creator-analytics.js
+   npx ts-node bonding-curve-analytics.ts
    ```
 
 ## Sample Output
 
 ```
-📈 YOINK CREATOR ANALYTICS DASHBOARD
-===================================
+📈 YOINK BONDING CURVE MARKET ANALYTICS
+======================================
 Last Update: 11/4/2025, 3:15:45 PM
-Tracking 127 creators
+Tracking 45 bonding curve tokens
 
-🏆 TOP PERFORMERS (24H):
+📊 MARKET SUMMARY
+-----------------
+Total Market Cap: 1,247.89 SOL
+Average Performance: +12.34%
+Active Curves: 32
+Completed Curves: 13
+Avg Time to Completion: 18.5h
+
+🏆 TOP PERFORMERS (24H)
 ------------------------
-1. 📈 StreamerName
-   Return: +34.56%
-   Volume: 12.4567 SOL
+1. 📈 🔄 TOKEN_HbiDw6U5
+   24h: +45.67%
+   Market Cap: 78.90 SOL
+   Progress: 87.3%
+   Buyers: 156
    Risk: 25/100
 
-2. 📈 AnotherCreator
-   Return: +18.23%
-   Volume: 8.9012 SOL
-   Risk: 35/100
+2. 📈 ✅ TOKEN_ABC12345
+   24h: +23.45%
+   Market Cap: 85.00 SOL
+   Progress: 100.0%
+   Buyers: 234
+   Risk: 15/100
 
-💡 KEY INSIGHTS:
-----------------
-✅ Market Performance: Average creator token performance: +8.45%
-✅ Best Performing Creator: StreamerName leading with 34.56% return
-ℹ️ Highest Volume: TopTrader with 45.6789 SOL in 24h volume
+💡 KEY INSIGHTS
+---------------
+✅ Market Performance: Average 24h return: +12.34%
+✅ Best Performing Token: TOKEN_HbiDw6U5 leading with +45.67%
+ℹ️ Curves Near Completion: 8 tokens approaching completion
+⚠️ High Risk Alert: 5 tokens showing high risk indicators
 
-📊 MARKET SUMMARY:
-------------------
-Average Return: +8.45%
-Positive: 89/127 (70.1%)
-Total Volume: 234.56 SOL
+📈 CURVE PROGRESS DISTRIBUTION
+------------------------------
+0-25%: 12 tokens
+25-50%: 8 tokens  
+50-75%: 7 tokens
+75-99%: 5 tokens
+Complete: 13 tokens
 ```
 
-## Advanced Analytics
+## Advanced Analytics Features
 
-- **Technical Indicators**: RSI, MACD, Bollinger Bands
-- **Correlation Analysis**: Creator-to-creator relationships
-- **Sentiment Analysis**: Social media integration
-- **Risk Models**: VaR calculations and stress testing
+- **Technical Indicators**: Volatility analysis, momentum calculations
+- **Risk Assessment**: Multi-factor risk scoring for informed decisions
+- **Market Timing**: Curve completion prediction models
+- **Buyer Behavior**: Growth rate analysis and acquisition patterns
+- **Performance Tracking**: Historical returns and trend analysis
+
+## Integration Ideas
+
+- **Discord/Telegram Bots**: Real-time market alerts and updates
+- **Trading Automation**: Connect with trading bots for signal generation
+- **Portfolio Optimization**: Risk-adjusted position sizing recommendations
+- **Research Tools**: Export data for further analysis and backtesting
 
 ## Next Steps
 
 - [📦 Back to SDK Overview](overview.md)
-- [🎥 Try Stream Monitor](stream-monitor.md)
-- [🤖 Creator Token Bot](creator-token-bot.md)
+- [🤖 Try Bonding Curve Trading Bot](creator-token-bot.md)
 - [📊 Portfolio Dashboard](portfolio-dashboard.md)
+- [📖 Read the Usage Guide](usage.md)
