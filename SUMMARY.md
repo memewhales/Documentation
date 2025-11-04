@@ -5,7 +5,7 @@
 ## Getting Started
 
 * [Quickstart](getting-started/quickstart.md)
-* [Connect Your Wallet](getting-started/connect-wallet.md)
+* [Connect Your Wallet](getting-started/connect-your-wallet.md)
 
 ## 🚀 Yoink
 
