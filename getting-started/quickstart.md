@@ -18,36 +18,17 @@ layout:
 
 # Quickstart
 
-<figure><img src="../.gitbook/assets/privy.png" alt=""><figcaption></figcaption></figure>
-
-Welcome to Yoink! This quickstart guide will get you trading creator tokens in minutes.
-
-## What You'll Need
-
-* An email address, phone number, or existing wallet
-* Some SOL for trading and transaction fees
-* A web browser (desktop recommended for best experience)
-
 ### Step 1: Connect Your Wallet
 
 <figure><img src="../.gitbook/assets/1.png" alt=""><figcaption></figcaption></figure>
 
-Yoink uses [Privy](https://privy.io) as our secure login method, supporting multiple authentication options:
-
-* **Email** - Sign in with your email address
-* **Phone** - Use your phone number with SMS verification
-* **Social Logins** - Connect via Google, Twitter, Discord, and more
-* **Existing Wallets** - Connect Phantom, Solflare, and other Solana wallets
-* **Embedded Wallets** - Get a secure, built-in wallet automatically created for you
-
-**How to connect:**
 1. Visit [https://yoink.now](https://yoink.now)
 2. Click the **"Connect"** button in the top right
 3. Choose your preferred login method
 4. Complete the authentication process
 
-{% hint style="success" %}
-**Tip**: If you're new to crypto, we recommend using email or social login - Privy will automatically create a secure embedded wallet for you! Make sure you have at least 0.1 SOL for trading fees and transactions.
+{% hint style="info" %}
+**New to crypto?** Yoink supports email and social logins through Privy - no wallet required! [Learn more about connecting your wallet →](connect-your-wallet.md)
 {% endhint %}
 
 ### Step 2: Browse Tokens
