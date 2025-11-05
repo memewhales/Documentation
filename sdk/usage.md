@@ -13,7 +13,7 @@ import { AnchorProvider } from "@coral-xyz/anchor";
 import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
 
 // Setup connection and provider
-const connection = new Connection("https://staging-rpc.dev2.eclipsenetwork.xyz");
+const connection = new Connection("RPC_URL_LINK");
 const wallet = new NodeWallet(yourKeypair);
 const provider = new AnchorProvider(connection, wallet, { commitment: "confirmed" });
 
@@ -275,13 +275,6 @@ console.log("Holder Stats PDA:", holderStatsPDA.toBase58());
 - Use batch requests when possible
 - Implement proper rate limiting to avoid RPC throttling
 - Handle network timeouts gracefully
-
-### 🎯 User Experience
-
-- Get quotes before executing trades
-- Show clear transaction feedback to users
-- Display estimated fees and price impact
-- Implement retry mechanisms for failed transactions
 
 ## Next Steps
 

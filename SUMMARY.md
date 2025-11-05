@@ -27,7 +27,7 @@
 * [📦 SDK Overview](sdk/overview.md)
 * [⚡ Quick Start](sdk/installation.md)
 * [🎯 Usage Guide](sdk/usage.md)
-* [🤖 Creator Token Trading Bot](sdk/creator-token-bot.md)
+* [🤖 Example - Trading Bot](sdk/creator-token-bot.md)
 * [📊 Portfolio Analytics Dashboard](sdk/portfolio-dashboard.md)
 * [🎥 Stream Monitor & Token Launcher](sdk/stream-monitor.md)
 * [📈 Creator Analytics & Insights](sdk/creator-analytics.md)

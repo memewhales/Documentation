@@ -1,4 +1,4 @@
-# 🤖 Bonding Curve Trading Bot
+# 🤖 Example - Trading Bot
 
 This example demonstrates how to create an intelligent trading bot specifically designed for Yoink bonding curve tokens, with features for monitoring market conditions, price movements, and automated trading strategies using the real SDK.
 
@@ -569,16 +569,6 @@ async function main() {
 main().catch(console.error);
 ```
 
-## Configuration Options
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `tokens` | Array | `[]` | List of token addresses to monitor |
-| `buyThreshold` | Number | `-5` | Price drop percentage to trigger buy |
-| `sellThreshold` | Number | `10` | Price rise percentage to trigger sell |
-| `tradeAmount` | Number | `0.1` | SOL amount per trade |
-| `checkInterval` | Number | `30000` | Monitoring interval in milliseconds |
-
 ## Safety Features
 
 - **Slippage Protection**: 5% maximum slippage on all trades
@@ -602,13 +592,6 @@ main().catch(console.error);
    ```bash
    node trading-bot.js
    ```
-
-## ⚠️ Important Notes
-
-- **Use devnet first**: Always test on devnet before using mainnet
-- **Start small**: Begin with small amounts to test your strategy
-- **Monitor closely**: Keep an eye on the bot's performance
-- **Risk management**: Never trade more than you can afford to lose
 
 ## Next Steps
 
