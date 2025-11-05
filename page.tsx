@@ -1,1202 +1,1015 @@
 "use client";
 
-// Force dynamic rendering - prevents static generation errors
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
-
-import { useState, useEffect } from "react";
-import { LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { BN } from "@coral-xyz/anchor";
-import { usePrivy } from '@privy-io/react-auth';
-import { User } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { Zap, Coins, ArrowRight, Loader2, RefreshCw } from "lucide-react";
-import { YoinkButton, YoinkButtonSecondary } from "@/components/YoinkButtons";
-import { usePump } from "@/providers/PumpProvider";
+import { useState, useEffect, useCallback } from "react";
+import { useSocketEvents } from "@/hooks/useSocketEvent";
+import { Card, CardContent, CardTitle } from "@/components/ui/card";
+import { Trophy, Lock, CheckCircle2, X, Info, Clock, Loader2 } from "lucide-react";
+import { useProfilePicture } from "@/hooks/useProfilePicture";
+import { useSocket } from "@/providers/SocketProvider";
 import { useToast } from "@/components/ui/use-toast";
-import { useRouter } from "next/navigation";
-import { useTwitch } from "@/providers/TwitchProvider";
-import { cn } from "@/lib/utils";
-import SolanaIcon from "@/components/SolanaIcon";
-import { Logo } from "@/components/Logo";
-import { useGoogleAnalytics } from "@/providers/GoogleAnalyticsProvider";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import Link from "next/link";
+import { SolanaIcon } from "./SolanaIcon";
+import { PublicKey } from "@solana/web3.js";
+import { usePump } from "@/providers/PumpProvider";
+import { getFormattedEarlyBirdInfo, formatSolPrecise } from "@/lib/fee-utils";
+import { usePricing } from "@/providers/PricingProvider";
+import { timeAgo } from "@/lib/utils";
+import { getDefaultProfilePicture } from "@/lib/getDefaultProfilePicture";
+import { EarlyBirdSeatAvatar } from "@/components/EarlyBirdSeatAvatar";
+import { EarlyBirdLeaderboardAvatar } from "@/components/EarlyBirdLeaderboardAvatar";
 
-export default function CreateStreamPage() {
-  const { createCoin } = usePump();
+interface EarlyBirdSeat {
+  position: number;
+  walletAddress: string | null;
+  balance: number;
+  firstBuyTimestamp?: string;
+  lastUpdated?: string;
+  isTaken: boolean;
+  isDisqualified?: boolean; // Track if this seat was disqualified (paper hands)
+  hasClaimed?: boolean;
+  claimedAmount?: string;
+  claimedAt?: string;
+}
+
+interface EarlyBirdsSeatsProps {
+  coinAddress: string;
+  userWallet?: string | null;
+  tokenSymbol?: string;
+  tokenImage?: string;
+  isPendingBonding?: boolean;
+}
+
+export function EarlyBirdsSeats({ coinAddress, userWallet, tokenSymbol = "tokens", tokenImage, isPendingBonding: initialIsPendingBonding }: EarlyBirdsSeatsProps) {
+  const [seats, setSeats] = useState<EarlyBirdSeat[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [totalBuyers, setTotalBuyers] = useState(0);
+  const { socket } = useSocket();
+  const { program, claimEarlyBirdRewards } = usePump();
+  const { solanaPrice } = usePricing();
   const { toast } = useToast();
-  const router = useRouter();
-  const { getCreatorStatusByUrl, loading: streamLoading } = useTwitch();
-  const { trackEvent } = useGoogleAnalytics();
+  const [earlyBirdPool, setEarlyBirdPool] = useState<string>("0.000000000");
+  const [totalEarlyBirdFees, setTotalEarlyBirdFees] = useState<string>("0.000000000");
+  const [isBonded, setIsBonded] = useState(false);
+  const [isPendingBonding, setIsPendingBonding] = useState(initialIsPendingBonding || false);
+  const [claiming, setClaiming] = useState(false);
+  const [userHasClaimed, setUserHasClaimed] = useState(false);
+  const [userClaimedAmount, setUserClaimedAmount] = useState<string | null>(null);
+  const [userHasSeat, setUserHasSeat] = useState(false);
+  // Store the pool balance at bonding time (before any claims)
+  const [poolAtBonding, setPoolAtBonding] = useState<string | null>(null);
 
-  // Set page metadata
-  useEffect(() => {
-    if (typeof document !== 'undefined') {
-      document.title = "Launch Your Creator Token - Yoink";
-    }
-  }, []);
-
-  const [streamTitle, setStreamTitle] = useState("");
-  const [tokenName, setTokenName] = useState("");
-  const [tokenSymbol, setTokenSymbol] = useState("");
-  const [streamLink, setStreamLink] = useState("");
-  const [isCreating, setIsCreating] = useState(false);
-  const [showSuccessLoader, setShowSuccessLoader] = useState(false);
-  const [loadingStep, setLoadingStep] = useState(0); // For animated progress steps
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [streamPreview, setStreamPreview] = useState<string | null>(null);
-  const [tokenDescription, setTokenDescription] = useState("");
-  const [twitchUserId, setTwitchUserId] = useState<string | undefined>(undefined);
-  const [twitchUserName, setTwitchUserName] = useState<string | undefined>(undefined);
-  const [twitchProfilePicture, setTwitchProfilePicture] = useState<string | undefined>(undefined);
-  const [showStream, setShowStream] = useState(false);
-  const [showVideo, setShowVideo] = useState(false);
-  const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
-  const [videoPreview, setVideoPreview] = useState<string | null>(null);
-  const [uploadingVideo, setUploadingVideo] = useState(false);
-  const [videoIpfsUrl, setVideoIpfsUrl] = useState<string | null>(null);
-  const [showSocials, setShowSocials] = useState(false);
-  const [showFirstBuy, setShowFirstBuy] = useState(false);
-  const [buyAmount, setBuyAmount] = useState("");
-  const [maxSolCost, setMaxSolCost] = useState("");
-  const [isDragging, setIsDragging] = useState(false);
-  const [socialLinks, setSocialLinks] = useState({
-    website: "",
-    twitter: "",
-    telegram: ""
-  });
-  const [errors, setErrors] = useState({
-    tokenName: "",
-    tokenSymbol: "",
-    streamTitle: "",
-    image: "",
-    description: "",
-    video: "",
-    website: "",
-    twitter: "",
-    telegram: "",
-    buyAmount: "",
-    maxSolCost: ""
-  });
-
-  const validateUrl = (url: string): boolean => {
-    if (!url) return true; // Optional fields
+  const handleClaim = async () => {
+    if (!coinAddress || claiming || !userWallet) return;
+    
     try {
-      new URL(url);
-      return true;
-    } catch {
-      return false;
+      setClaiming(true);
+      console.log('[EarlyBirdsSeats] Claiming Early Bird rewards for:', coinAddress);
+      
+      const result = await claimEarlyBirdRewards(coinAddress);
+      
+      if (result.success) {
+        console.log('[EarlyBirdsSeats] Successfully claimed rewards!');
+        
+        // Show success toast
+        toast({
+          title: "Rewards Claimed!",
+          description: "Your Early Bird rewards have been successfully claimed.",
+          variant: "success",
+          className: "bg-green-950/50 border-green-500/30",
+          duration: 6000,
+          style: { color: '#4ade80' }
+        });
+        
+        // Note: No need to refetch here - socket listener will handle the update
+        // when backend emits earlyBirdClaimedEvent
+      } else {
+        console.error('[EarlyBirdsSeats] Failed to claim rewards:', result.error);
+        
+        // Check if user cancelled/rejected the transaction
+        const isCancelled = result.error && 
+          (result.error.includes('User rejected') || 
+           result.error.includes('cancelled') ||
+           result.error.includes('window closed') ||
+           result.error.includes('Plugin Closed'));
+        
+        if (!isCancelled) {
+          // Show error toast only if not cancelled
+          toast({
+            title: "Claim Failed",
+            description: result.error || 'Failed to claim rewards',
+            variant: "destructive",
+            duration: 6000,
+          });
+          setError(result.error || 'Failed to claim rewards');
+        }
+      }
+    } catch (err) {
+      console.error('[EarlyBirdsSeats] Error claiming rewards:', err);
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred while claiming rewards';
+      
+      // Check if user cancelled/rejected the transaction
+      const isCancelled = errorMessage.includes('User rejected') || 
+        errorMessage.includes('cancelled') ||
+        errorMessage.includes('window closed') ||
+        errorMessage.includes('Plugin Closed');
+      
+      if (!isCancelled) {
+        // Show error toast only if not cancelled
+        toast({
+          title: "Claim Failed",
+          description: errorMessage,
+          variant: "destructive",
+          duration: 6000,
+        });
+        setError(errorMessage);
+      }
+    } finally {
+      setClaiming(false);
     }
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        setErrors(prev => ({ ...prev, image: "Image must be less than 5MB" }));
+  const formatAddress = (address: string): string =>
+    address ? `${address.substring(0, 4)}...${address.substring(address.length - 4)}` : "";
+
+  // Helper function to format numbers (humanize large numbers)
+  const formatNumber = (num: number): string => {
+    if (num >= 1e9) return `${(num / 1e9).toFixed(2)}B`;
+    if (num >= 1e6) return `${(num / 1e6).toFixed(2)}M`;
+    if (num >= 1e3) return `${(num / 1e3).toFixed(2)}K`;
+    return num.toFixed(2);
+  };
+
+  const fetchEarlyBirds = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Validate coinAddress
+      if (!coinAddress) {
+        console.error("No coin address provided");
+        setError("No coin address provided");
+        setLoading(false);
         return;
       }
-      setSelectedImage(file);
-      setImagePreview(URL.createObjectURL(file));
-      setErrors(prev => ({ ...prev, image: "" }));
-    }
-  };
 
-  const handleVideoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      await processVideoFile(file);
-    }
-  };
+      console.log("Fetching early birds for coin:", coinAddress);
 
-  const processVideoFile = async (file: File) => {
-    if (file.size > 100 * 1024 * 1024) {
-      setErrors(prev => ({ ...prev, video: "Video must be less than 100MB" }));
-      return;
-    }
-    if (!file.type.startsWith('video/')) {
-      setErrors(prev => ({ ...prev, video: "Please select a valid video file" }));
-      return;
-    }
-    
-    setSelectedVideo(file);
-    setVideoPreview(URL.createObjectURL(file));
-    setErrors(prev => ({ ...prev, video: "" }));
-    
-    // Upload video to backend immediately
-    await uploadVideoToPinata(file);
-  };
-
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-  };
-
-  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-
-    const file = e.dataTransfer.files?.[0];
-    if (file) {
-      await processVideoFile(file);
-    }
-  };
-
-  const uploadVideoToPinata = async (file: File) => {
-    setUploadingVideo(true);
-    try {
-      const formData = new FormData();
-      formData.append('video', file);
-
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/upload-video`, {
-        method: 'POST',
-        body: formData,
-      });
-
+      // Fetch from backend API instead of blockchain
+      const response = await fetch(`/api/early-birds/${coinAddress}`);
+      
       if (!response.ok) {
-        throw new Error('Failed to upload video');
+        const errorData = await response.json().catch(() => ({ message: 'Failed to fetch early birds' }));
+        throw new Error(errorData.message || 'Failed to fetch early birds');
       }
 
       const data = await response.json();
-      setVideoIpfsUrl(data.ipfsUrl);
       
-      toast({
-        title: "Success",
-        description: "Video uploaded successfully!",
-      });
-    } catch (error) {
-      console.error('Error uploading video:', error);
-      setErrors(prev => ({ ...prev, video: "Failed to upload video. Please try again." }));
-      setSelectedVideo(null);
-      setVideoPreview(null);
-      toast({
-        title: "Error",
-        description: "Failed to upload video. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setUploadingVideo(false);
-    }
-  };
-
-  // Format large numbers to K/M/B format
-  const formatNumber = (num: number): string => {
-    const absNum = Math.abs(num);
-    if (absNum >= 1e9) return `${(num / 1e9).toFixed(2)}B`;
-    if (absNum >= 1e6) return `${(num / 1e6).toFixed(2)}M`;
-    if (absNum >= 1e3) return `${(num / 1e3).toFixed(2)}K`;
-    return absNum < 1 ? num.toFixed(2) : num.toFixed(0);
-  };
-
-  // Calculate token amount ensuring total cost matches user's selected amount
-  const calculateTokenAmount = (solAmount: number): { tokenAmount: number, maxCostLamports: number } => {
-    if (!solAmount || solAmount <= 0) return { tokenAmount: 0, maxCostLamports: 0 };
-
-    // Convert desired total SOL amount to lamports
-    const desiredTotalLamports = Math.floor(solAmount * LAMPORTS_PER_SOL);
-
-    // Work backwards to find base amount:
-    // If total = base + (base * 0.0345), then base = total / (1 + 0.0345)
-    const feeBasisPoints = 345; // 3.45% in basis points
-    const baseCost = Math.floor(desiredTotalLamports * 10000 / (10000 + feeBasisPoints));
-
-    // Initial reserves from contract
-    const virtualSolReserves = 30000000001;  // Initial reserves in lamports
-    const virtualTokenReserves = 1073000000000000;  // Initial reserves in raw units
-
-    // Calculate token output using bonding curve formula with adjusted base amount
-    const tokenAmount = Math.floor((baseCost * virtualTokenReserves) / virtualSolReserves);
-
-    // For max cost, add 10% slippage to the total desired amount
-    const maxCostLamports = Math.floor(desiredTotalLamports * 1.10);
-
-    console.log('Buy calculation details:', {
-      desiredTotalLamports,
-      baseCost,
-      tokenAmount,
-      maxCostLamports,
-      initialReserves: {
-        sol: virtualSolReserves,
-        token: virtualTokenReserves
-      },
-      formatted: {
-        solAmount: solAmount.toFixed(9),
-        tokenAmount: (tokenAmount / 1e6).toFixed(6),
-        maxCostSol: (maxCostLamports / LAMPORTS_PER_SOL).toFixed(9)
+      if (!data.success) {
+        throw new Error(data.message || 'Failed to fetch early birds');
       }
-    });
 
-    return { tokenAmount, maxCostLamports };
-  };
+      console.log(`Found ${data.totalSeats} early bird positions`);
+      console.log('[EarlyBirdsSeats] API response:', data.seats);
 
-  const validateForm = () => {
-    const newErrors = {
-      tokenName: "",
-      tokenSymbol: "",
-      streamTitle: "",
-      image: "",
-      description: "",
-      video: "",
-      website: "",
-      twitter: "",
-      telegram: "",
-      buyAmount: "",
-      maxSolCost: ""
-    };
-
-    // Validate URLs if provided
-    if (socialLinks.website && !validateUrl(socialLinks.website)) {
-      newErrors.website = "Please enter a valid URL";
-    }
-    if (socialLinks.twitter && !validateUrl(socialLinks.twitter)) {
-      newErrors.twitter = "Please enter a valid URL";
-    }
-    if (socialLinks.telegram && !validateUrl(socialLinks.telegram)) {
-      newErrors.telegram = "Please enter a valid URL";
-    }
-    if (!tokenName.trim()) {
-      newErrors.tokenName = "Token name is required";
-    } else if (tokenName.length > 32) {
-      newErrors.tokenName = "Token name must be 32 characters or less";
-    }
-    
-    if (!selectedImage) newErrors.image = "Please select an image";
-    if (!tokenDescription.trim()) newErrors.description = "Token description is required";
-
-    if (!tokenSymbol.trim()) {
-      newErrors.tokenSymbol = "Token symbol is required";
-    } else if (tokenSymbol.length > 10) {
-      newErrors.tokenSymbol = "Token symbol must be 10 characters or less";
-    } else if (!/^[A-Z0-9]+$/.test(tokenSymbol)) {
-      newErrors.tokenSymbol = "Token symbol must contain only uppercase letters and numbers";
-    }
-
-    if (showStream && !streamTitle.trim()) {
-      newErrors.streamTitle = "Stream title is required";
-    }
-
-    // Validate buy inputs if first buy is enabled
-    if (showFirstBuy) {
-      if (!buyAmount || parseFloat(buyAmount) <= 0) {
-        newErrors.buyAmount = "Please enter a valid amount";
+      // If pool at bonding is available from API, use it
+      if (data.earlyBirdPoolAtBonding) {
+        const poolInSol = data.earlyBirdPoolAtBonding / 1e9;
+        const formattedPool = formatSolPrecise(data.earlyBirdPoolAtBonding);
+        setPoolAtBonding(formattedPool);
+        console.log('[EarlyBirdsSeats] Loaded pool at bonding from API:', formattedPool, 'SOL');
       }
-      if (!maxSolCost || parseFloat(maxSolCost) <= 0) {
-        newErrors.maxSolCost = "Please enter a valid maximum SOL amount";
-      }
-    }
-    setErrors(newErrors);
-    return !Object.values(newErrors).some(error => error !== "");
-  };
 
-  const { user: privyUser, login } = usePrivy();
+      // Transform API response into seat data
+      const allSeats: EarlyBirdSeat[] = Array.from({ length: 50 }, (_, i) => {
+        const position = i + 1;
+        const apiSeat = data.seats?.find((s: any) => s.position === position);
 
-  // Cycle through loading steps sequentially
-  useEffect(() => {
-    if (showSuccessLoader) {
-      let currentStep = 0;
-      let currentTimeout: NodeJS.Timeout;
-
-      const showNextStep = () => {
-        // If we've reached the last step (5), stay there
-        if (currentStep >= 6) {
-          return;
+        if (apiSeat) {
+          // Check if this seat is disqualified (paper hands penalty)
+          if (apiSeat.isDisqualified) {
+            return {
+              position,
+              walletAddress: apiSeat.walletAddress, // Keep the wallet address for display
+              balance: 0,
+              isTaken: false,
+              isDisqualified: true, // Show red X overlay
+            };
+          }
+          
+          // Active seat with holder
+          if (apiSeat.walletAddress) {
+            const seat = {
+              position,
+              walletAddress: apiSeat.walletAddress,
+              balance: apiSeat.balance || 0,
+              firstBuyTimestamp: apiSeat.firstBuyTimestamp,
+              lastUpdated: apiSeat.lastUpdated,
+              isTaken: true,
+              isDisqualified: false,
+              hasClaimed: apiSeat.hasClaimed || false,
+              claimedAmount: apiSeat.claimedAmount,
+              claimedAt: apiSeat.claimedAt,
+            };
+            
+            if (seat.hasClaimed) {
+              console.log(`[EarlyBirdsSeats] Seat #${position} has claimed:`, {
+                hasClaimed: seat.hasClaimed,
+                claimedAmount: seat.claimedAmount,
+                claimedAt: seat.claimedAt
+              });
+            }
+            
+            return seat;
+          }
         }
 
-        setLoadingStep(currentStep);
-        currentStep++;
+        // Empty seat (available)
+        return {
+          position,
+          walletAddress: null,
+          balance: 0,
+          isTaken: false,
+          isDisqualified: false,
+        };
+      });
 
-        // Continue to next step with a delay
-        currentTimeout = setTimeout(showNextStep, 800);
-      };
-
-      // Start the cycle
-      showNextStep();
-
-      return () => clearTimeout(currentTimeout);
+      setSeats(allSeats);
+      
+      // Check if current user has claimed
+      if (userWallet) {
+        const userSeat = allSeats.find(s => s.walletAddress === userWallet && !s.isDisqualified);
+        setUserHasSeat(!!userSeat);
+        setUserHasClaimed(userSeat?.hasClaimed || false);
+        setUserClaimedAmount(userSeat?.claimedAmount || null);
+        console.log('[EarlyBirdsSeats] User claim status:', {
+          userWallet,
+          hasSeat: !!userSeat,
+          hasClaimed: userSeat?.hasClaimed || false,
+          claimedAmount: userSeat?.claimedAmount
+        });
+      }
+    } catch (err) {
+      console.error("Error fetching early birds:", err);
+      setError(err instanceof Error ? err.message : "Failed to load Early Bird seats");
+    } finally {
+      setLoading(false);
     }
-  }, [showSuccessLoader]);
+  }, [coinAddress, userWallet]);
 
-  // Loading steps configuration
-  const loadingSteps = [
-    { icon: Loader2, text: "Confirming transaction...", spin: true },
-    { icon: RefreshCw, text: "Verifying token metadata...", spin: true },
-    { icon: Coins, text: "Minting the SPL token", spin: false },
-    { icon: Zap, text: "Setting up bonding curve...", spin: false },
-    { icon: ArrowRight, text: "Updating all records", spin: false },
-    { icon: Loader2, text: "Almost ready...", spin: true },
-  ];
+  // Fetch Early Bird pool data
+  const fetchEarlyBirdPool = useCallback(async () => {
+    try {
+      if (!program || !coinAddress) return;
+      
+      const mint = new PublicKey(coinAddress);
+      const earlyBirdInfo = await getFormattedEarlyBirdInfo(program, mint);
+      
+      setEarlyBirdPool(earlyBirdInfo.poolBalance);
+      setTotalEarlyBirdFees(earlyBirdInfo.totalFeesAccrued);
+    } catch (err) {
+      console.error("Error fetching Early Bird pool:", err);
+    }
+  }, [program, coinAddress]);
+
+  // Initial data fetch
+  useEffect(() => {
+    fetchEarlyBirds();
+    fetchEarlyBirdPool();
+  }, [fetchEarlyBirds, fetchEarlyBirdPool]);
+
+  // Early bird update handlers with useCallback for stable references
+  const handleEarlyBirdUpdate = useCallback((eventData: any) => {
+    const data = Array.isArray(eventData) ? eventData[1].data : eventData.data;
+    
+    if (data?.mint !== coinAddress) return;
+    
+    setSeats(prev => prev.map(seat => {
+      if (seat.position === data.position) {
+        return {
+          ...seat,
+          position: data.position,
+          walletAddress: data.walletAddress,
+          balance: data.balance || 0,
+          firstBuyTimestamp: data.firstBuyTimestamp,
+          lastUpdated: data.lastUpdated,
+          isTaken: !!data.walletAddress,
+          isDisqualified: false,
+        };
+      }
+      return seat;
+    }));
+  }, [coinAddress]);
+
+  const handleEarlyBirdRemoved = useCallback((eventData: any) => {
+    const data = Array.isArray(eventData) ? eventData[1].data : eventData.data;
+    
+    if (data?.mint !== coinAddress) return;
+    
+    setSeats(prev => prev.map(seat => {
+      if (seat.position === data.position && seat.walletAddress === data.walletAddress) {
+        return {
+          ...seat,
+          balance: 0,
+          isTaken: false,
+          isDisqualified: true,
+        };
+      }
+      return seat;
+    }));
+  }, [coinAddress]);
+
+  // Use socket events hook for early bird updates with automatic cleanup
+  useSocketEvents(
+    socket,
+    {
+      'earlyBirdUpdate': handleEarlyBirdUpdate,
+      'earlyBirdRemoved': handleEarlyBirdRemoved,
+    },
+    [handleEarlyBirdUpdate, handleEarlyBirdRemoved]
+  );
+
+  // Trade and bonding event handlers with useCallback for stable references
+  const handleTradeEvent = useCallback((eventData: any) => {
+    const data = Array.isArray(eventData) ? eventData[1].data : eventData.data;
+    
+    if (data?.mint !== coinAddress) return;
+
+    if (!isBonded && !isPendingBonding) {
+      setEarlyBirdPool(formatSolPrecise((data.earlyBirdPool || 0) * 1e9));
+      setTotalEarlyBirdFees(formatSolPrecise((data.totalEarlyBirdFeesAccrued || 0) * 1e9));
+    }
+    
+    if (data.post?.isPendingBonding) {
+      setIsPendingBonding(true);
+    }
+    
+    if (data.post?.hasBonded) {
+      setIsBonded(true);
+      setIsPendingBonding(false);
+    }
+  }, [coinAddress, isBonded, isPendingBonding]);
+
+  const handleCompleteEvent = useCallback((event: any) => {
+    const data = event.data || event;
+    
+    let eventMintAddress;
+    if (data.mint) {
+      if (typeof data.mint === 'string') {
+        eventMintAddress = data.mint;
+      } else if (data.mint.toString) {
+        eventMintAddress = data.mint.toString();
+      } else if (data.mint._bn) {
+        eventMintAddress = data.mint.toBase58?.() || data.mint.toString();
+      }
+    }
+    
+    if (eventMintAddress === coinAddress) {
+      setIsPendingBonding(true);
+      
+      if (data.earlyBirdPool !== undefined) {
+        const poolLamports = typeof data.earlyBirdPool === 'string' 
+          ? parseInt(data.earlyBirdPool, 16) 
+          : data.earlyBirdPool;
+        const formattedPool = formatSolPrecise(poolLamports);
+        setPoolAtBonding(formattedPool);
+      } else {
+        setPoolAtBonding(earlyBirdPool);
+      }
+      
+      fetchEarlyBirdPool();
+    }
+  }, [coinAddress, earlyBirdPool, fetchEarlyBirdPool]);
+
+  const handleCompletedBondEvent = useCallback((event: any) => {
+    const data = event.data || event;
+    
+    let eventMintAddress;
+    if (data.mint) {
+      if (typeof data.mint === 'string') {
+        eventMintAddress = data.mint;
+      } else if (data.mint.toString) {
+        eventMintAddress = data.mint.toString();
+      } else if (data.mint._bn) {
+        eventMintAddress = data.mint.toBase58?.() || data.mint.toString();
+      }
+    }
+    
+    if (eventMintAddress === coinAddress) {
+      setIsBonded(true);
+      setIsPendingBonding(false);
+      
+      if (data.post?.earlyBirdPoolAtBonding) {
+        const formattedPool = formatSolPrecise(data.post.earlyBirdPoolAtBonding);
+        setPoolAtBonding(formattedPool);
+      } else if (!poolAtBonding) {
+        setPoolAtBonding(earlyBirdPool);
+      }
+      
+      fetchEarlyBirdPool();
+    }
+  }, [coinAddress, earlyBirdPool, poolAtBonding, fetchEarlyBirdPool]);
+
+  const handleEarlyBirdClaimedEvent = useCallback((eventData: any) => {
+    const data = Array.isArray(eventData) ? eventData[1].data : eventData.data;
+    
+    let eventMintAddress;
+    if (data.mint) {
+      if (typeof data.mint === 'string') {
+        eventMintAddress = data.mint;
+      } else if (data.mint.toString) {
+        eventMintAddress = data.mint.toString();
+      } else if (data.mint._bn) {
+        eventMintAddress = data.mint.toBase58?.() || data.mint.toString();
+      }
+    }
+    
+    if (eventMintAddress === coinAddress) {
+      let userAddress;
+      if (data.user) {
+        if (typeof data.user === 'string') {
+          userAddress = data.user;
+        } else if (data.user.toString) {
+          userAddress = data.user.toString();
+        } else if (data.user.toBase58) {
+          userAddress = data.user.toBase58();
+        }
+      }
+      
+      if (userAddress) {
+        setSeats(prevSeats => prevSeats.map(seat => {
+          if (seat.walletAddress === userAddress) {
+            return {
+              ...seat,
+              hasClaimed: true,
+              claimedAmount: data.amount?.toString(),
+              claimedAt: data.timestamp ? new Date(data.timestamp * 1000).toISOString() : new Date().toISOString()
+            };
+          }
+          return seat;
+        }));
+        
+        if (userAddress === userWallet) {
+          setUserHasClaimed(true);
+          setUserClaimedAmount(data.amount?.toString() || null);
+        }
+      }
+    }
+  }, [coinAddress, userWallet]);
+
+  // Use socket events hook for trade and bonding events with automatic cleanup
+  useSocketEvents(
+    socket,
+    {
+      'tradeEvent': handleTradeEvent,
+      'completeEvent': handleCompleteEvent,
+      'completedBond': handleCompletedBondEvent,
+      'earlyBirdClaimedEvent': handleEarlyBirdClaimedEvent,
+    },
+    [handleTradeEvent, handleCompleteEvent, handleCompletedBondEvent, handleEarlyBirdClaimedEvent]
+  );
+
+  const takenSeats = seats.filter((s) => s.isTaken).length;
+  const disqualifiedSeats = seats.filter((s) => s.isDisqualified).length;
+  const availableSeats = 50 - takenSeats - disqualifiedSeats;
+
+  // Display pool: use the snapshot at bonding time during claiming phase, otherwise use current pool
+  const displayPool = (isBonded || isPendingBonding) && poolAtBonding ? poolAtBonding : earlyBirdPool;
+
+  // Calculate potential share per Early Bird if claiming now
+  const calculatePotentialShare = () => {
+    if (takenSeats === 0) return "0.000000000";
+    const poolLamports = parseFloat(displayPool) * 1e9;
+    const sharePerSeat = poolLamports / takenSeats;
+    return formatSolPrecise(sharePerSeat);
+  };
+
+  const potentialShare = calculatePotentialShare();
 
   return (
-    <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8">
-      {showSuccessLoader ? (
-        <div className="fixed inset-0 bg-background/95 backdrop-blur-sm z-50 flex items-center justify-center">
-          <div className="max-w-md w-full mx-4">
-            <Card className="p-8 sm:p-10 shadow-2xl ">
-              {/* Logo with Animation */}
-              <div className="flex flex-col items-center space-y-8">
-                <div className="relative">
-                  {/* Animated rings */}
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-full border-4 border-accent/20 border-t-accent animate-spin"></div>
-                  </div>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-accent/10 border-b-accent/50 animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
-                  </div>
-                  
-                  {/* Logo in center - FULL OPACITY */}
-                  <div className="relative z-10 flex items-center justify-center w-32 h-32 sm:w-40 sm:h-40 opacity-100">
-                    <Logo size="sm" />
-                  </div>
-                </div>
-                
-                {/* Status Text */}
-                <div className="text-center space-y-3">
-                  <h2 className="text-2xl sm:text-3xl font-bold text-foreground">
-                    Creating your coin
-                  </h2>
-                  <p className="text-muted-foreground text-sm sm:text-base leading-relaxed">
-                    Minting your token on the blockchain...
-                  </p>
-                </div>
-
-                {/* Animated Progress Steps */}
-                <div className="w-full space-y-3">
-                  {loadingSteps.map((step, index) => {
-                    const StepIcon = step.icon;
-                    const isActive = index === loadingStep;
-                    const isPast = index < loadingStep;
-                    
-                    return (
-                      <div 
-                        key={index}
-                        className={cn(
-                          "flex items-center gap-3 text-sm transition-all duration-500",
-                          isActive ? "opacity-100 scale-100" : isPast ? "opacity-100" : "opacity-20"
-                        )}
-                      >
-                        <div className={cn(
-                          "flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-all duration-500",
-                          isActive ? "bg-accent/20 scale-110" : isPast ? "bg-accent/10" : "bg-secondary/30"
-                        )}>
-                          <StepIcon className={cn(
-                            "h-4 w-4 transition-colors duration-500",
-                            isActive ? "text-accent" : isPast ? "text-accent/60" : "text-muted-foreground",
-                            step.spin && isActive && "animate-spin"
-                          )} />
-                        </div>
-                        <span className={cn(
-                          "transition-all duration-500",
-                          isActive ? "text-foreground font-medium" : isPast ? "text-foreground/80" : "text-muted-foreground"
-                        )}>
-                          {step.text}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Bottom hint */}
-                <div className="pt-4 border-t border-border/30 w-full">
-                  <p className="text-xs text-center text-muted-foreground/70">
-                    Please don't close this window
-                  </p>
-                </div>
-              </div>
-            </Card>
-          </div>
+    <TooltipProvider>
+    <div className="space-y-4 px-1 sm:px-4">
+      <CardTitle className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-0">
+        <div className="flex items-center gap-2">
+          <Trophy className="h-4 w-4 sm:h-5 sm:w-5 text-amber-500" />
+          <span className="text-base sm:text-lg font-semibold">Early Bird Seats (First 50 Buyers)</span>
         </div>
-      ) : !privyUser ? (
-        <div className="max-w-2xl mx-auto space-y-4 sm:space-y-6">
-          <Card className="p-6 sm:p-8 shadow-sm">
-            {/* Header Section */}
-            <div className="flex flex-col items-center text-center space-y-6 mb-8">
-              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-accent/20 to-accent/10 border-2 border-accent/30 flex items-center justify-center shadow-lg">
-                <Coins className="h-10 w-10 sm:h-12 sm:w-12 text-accent" />
-              </div>
-              
-              <div className="space-y-2">
-                <h2 className="text-2xl sm:text-3xl font-bold text-foreground">
-                  Connect Your Wallet to Create
-                </h2>
-                <p className="text-base sm:text-lg text-muted-foreground max-w-md mx-auto leading-relaxed">
-                  Bring your idea to life in seconds — mint your token directly on-chain with one click.
-                </p>
-              </div>
-            </div>
-
-            {/* Action Section */}
-            <div className="flex flex-col items-center space-y-6">
-              <YoinkButton 
-                text="Connect Wallet" 
-                onClick={login} 
-                className="h-12 sm:h-14 px-8 sm:px-10 text-base sm:text-lg font-semibold min-w-[200px]"
-              />
-              
-              {/* Info Box */}
-              <div className="w-full p-4 rounded-lg bg-secondary/20 border border-border/30">
-                <div className="flex items-start gap-3 text-sm text-muted-foreground">
-                  <div className="flex-shrink-0 mt-0.5">
-                    <svg className="h-5 w-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <div className="flex-1 leading-relaxed">
-                    <span className="font-semibold text-foreground">First time in crypto?</span> Just login with your social network of choice and start creating.
-                  </div>
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          {/* Feature Highlights */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <Card className="p-4 text-center">
-              <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-3">
-                <Zap className="h-5 w-5 text-accent" />
-              </div>
-              <h3 className="font-semibold text-sm mb-1">Instant Launch</h3>
-
-              <p className="text-xs text-muted-foreground">Deploy and trade your token instantly — no waiting, no coding.</p>
-            </Card>
-            
-            <Card className="p-4 text-center">
-              <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-3">
-                <Coins className="h-5 w-5 text-accent" />
-              </div>
-              <h3 className="font-semibold text-sm mb-1">Effortless Creation</h3>
-              <p className="text-xs text-muted-foreground">No code, no hassle. Just connect, customize, and deploy.</p>
-            </Card>
-            
-            <Card className="p-4 text-center">
-              <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-3">
-                <ArrowRight className="h-5 w-5 text-accent" />
-              </div>
-              <h3 className="font-semibold text-sm mb-1">Lightning Fast</h3>
-              <p className="text-xs text-muted-foreground">Go from idea to token in under 60 seconds.</p>
-            </Card>
-          </div>
+        <div className="flex items-center gap-3 text-sm flex-wrap">
+          <span className="text-green-500">
+            <CheckCircle2 className="h-4 w-4 inline mr-1" />
+            {takenSeats} Taken
+          </span>
+          {disqualifiedSeats > 0 && (
+            <span className="text-red-500">
+              <X className="h-4 w-4 inline mr-1" />
+              {disqualifiedSeats} Disqualified
+            </span>
+          )}
+          <span className="text-muted-foreground">
+            <Lock className="h-4 w-4 inline mr-1" />
+            {availableSeats} Available
+          </span>
         </div>
-      ) : (
-        <div className="max-w-2xl mx-auto space-y-4 sm:space-y-6">
-          {/* Main Form */}
-          <Card className="p-3 sm:p-6">
-          <div className="space-y-4 sm:space-y-6">
-            {/* Token Details */}
-            <div>
-              <h2 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-6 text-foreground">Token Details</h2>
-              <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
-                {/* Image Upload */}
-                <div className="flex-shrink-0 flex flex-col items-center sm:items-start">
-                  <Label className="mb-1.5 block text-sm">Token Image</Label>
-                  <div
-                    className="h-20 w-20 sm:h-24 sm:w-24 bg-gradient-to-b from-secondary/40 to-secondary/20 rounded-full border border-border/20 shadow-sm cursor-pointer overflow-hidden relative hover:border-accent/50 hover:shadow-glow-sm transition-all duration-200"
-                    onClick={() => document.getElementById('imageInput')?.click()}
-                  >
-                    <input
-                      type="file"
-                      id="imageInput"
-                      className="hidden"
-                      accept="image/*"
-                      onChange={handleImageChange}
-                    />
-                    {imagePreview ? (
-                      <img
-                        src={imagePreview}
-                        alt="Token Preview"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="text-center">
-                          <div className="text-[10px] sm:text-xs">Upload</div>
-                          <div className="text-[10px] sm:text-xs text-muted-foreground">Max 5MB</div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  {errors.image && (
-                    <p className="text-xs text-accent mt-1 text-center sm:text-left">{errors.image}</p>
-                  )}
-                </div>
+      </CardTitle>
 
-                {/* Token Info */}
-                <div className="flex-grow space-y-3 sm:space-y-4">
-                  <div>
-                    <Label className="text-sm">Token Name</Label>
-                    <Input
-                      value={tokenName}
-                      onChange={(e) => {
-                        setTokenName(e.target.value);
-                        if (errors.tokenName) setErrors(prev => ({ ...prev, tokenName: "" }));
-                      }}
-                      placeholder="e.g., Cyber Token, Neon Token"
-                      className={cn("bg-secondary/20 border-border/20 text-sm h-9 sm:h-10", errors.tokenName && "border-accent/50")}
-                      maxLength={32}
-                    />
-                    {errors.tokenName ? (
-                      <p className="text-xs text-accent mt-1">{errors.tokenName}</p>
-                    ) : (
-                      <p className="text-xs text-muted-foreground mt-1">The full name of your token (max 32 characters)</p>
-                    )}
-                  </div>
+      {/* Info Section: How it works + Pool data */}
+      <div className="px-2 py-3 space-y-2">
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          First 50 buyers share 2% of all trading fees equally when curve completes.
+        </p>
+        <p className="text-sm text-red-400 font-semibold leading-relaxed">
+          Selling = permanent disqualification.
+        </p>
+        
+        {/* Show info during claiming phase that pool amount is locked */}
+        {(isBonded || isPendingBonding) && poolAtBonding && (
+          <p className="text-sm text-amber-400 leading-relaxed flex items-center gap-1.5">
+            <Info className="h-3.5 w-3.5" />
+            Pool frozen at bonding completion - total rewards locked in!
+          </p>
+        )}
 
-                  <div>
-                    <Label className="text-sm">Token Symbol</Label>
-                    <Input
-                      value={tokenSymbol}
-                      onChange={(e) => {
-                        const value = e.target.value.toUpperCase();
-                        setTokenSymbol(value);
-                        if (errors.tokenSymbol) setErrors(prev => ({ ...prev, tokenSymbol: "" }));
-                      }}
-                      placeholder="e.g., CYBER, NEON"
-                      className={cn("bg-secondary/20 border-border/20 text-sm h-9 sm:h-10", errors.tokenSymbol && "border-accent/50")}
-                      maxLength={10}
-                    />
-                    {errors.tokenSymbol ? (
-                      <p className="text-xs text-accent mt-1">{errors.tokenSymbol}</p>
-                    ) : (
-                      <p className="text-xs text-muted-foreground mt-1">Trading symbol (max 10 characters)</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-3 sm:mt-4">
-                <Label className="text-sm">Token Description</Label>
-                <textarea
-                  value={tokenDescription}
-                  onChange={(e) => setTokenDescription(e.target.value)}
-                  placeholder="Describe your token and its purpose..."
-                  className={cn(
-                    "w-full min-h-[60px] sm:min-h-[80px] bg-secondary/20 border-border/20 rounded-md p-2 text-sm resize-y",
-                    errors.description && "border-accent/50"
-                  )}
-                  maxLength={500}
-                />
-                {errors.description ? (
-                  <p className="text-xs text-accent mt-1">{errors.description}</p>
-                ) : (
-                  <p className="text-xs text-muted-foreground mt-1">A brief description of your token (max 500 characters)</p>
+        {/* Pool Stats - Left aligned */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 text-sm pt-1">
+          <div className="flex items-center gap-4">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-muted-foreground text-xs">
+                {(isBonded || isPendingBonding) ? 'Total Bird Pool (at bonding):' : 'Total Bird Pool:'}
+              </span>
+              <span className="font-bold inline-flex items-center gap-1">
+                <SolanaIcon size="sm" />
+                <span className="text-foreground">{displayPool}</span>
+                {solanaPrice?.solana?.usd && (
+                  <span className="text-muted-foreground text-xs">
+                    (${(parseFloat(displayPool) * solanaPrice.solana.usd).toFixed(2)})
+                  </span>
+                )}
+              </span>
+            </div>
+            <div className="h-8 w-px bg-border"></div>
+            <div className="flex flex-col gap-0.5">
+              <span className="text-muted-foreground text-xs">Per Seat:</span>
+              <span className="font-bold text-accent inline-flex items-center gap-1">
+                <SolanaIcon size="sm" />
+                <span>{potentialShare}</span>
+                {solanaPrice?.solana?.usd && (
+                  <span className="text-muted-foreground text-xs">
+                    (${(parseFloat(potentialShare) * solanaPrice.solana.usd).toFixed(2)})
+                  </span>
+                )}
+              </span>
+            </div>
+          </div>
+          {!isBonded && !isPendingBonding && userHasSeat && (
+            <div className="text-amber-500 font-semibold flex items-center gap-1.5">
+              ⏳ Claim after bonding
+            </div>
+          )}
+          {(isPendingBonding || isBonded) && userWallet && userHasSeat && !userHasClaimed && (
+            <button
+              onClick={handleClaim}
+              disabled={claiming}
+              className="flex justify-center items-center gap-1.5 h-9 px-4 py-2 rounded-md font-medium text-sm transition-all duration-200 disabled:cursor-not-allowed bg-secondary/40 backdrop-blur-sm border border-border/60 text-foreground hover:bg-secondary/60 hover:text-neon-green hover:border-neon-green disabled:opacity-50 disabled:hover:bg-secondary/40 disabled:hover:text-foreground disabled:hover:border-border/60 dark:bg-black/40 dark:border-white/5 dark:text-foreground/80 dark:hover:bg-black/60 dark:hover:text-neon-green dark:hover:border-neon-green"
+            >
+              {claiming ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Claiming...
+                </>
+              ) : (
+                <>
+                  <Trophy className="h-4 w-4" />
+                  Claim Your Rewards
+                </>
+              )}
+            </button>
+          )}
+          {(isPendingBonding || isBonded) && userWallet && userHasClaimed && (
+            <Card className="border-neon-green/60 dark:border-neon-green/30">
+              <div className="flex justify-center items-center gap-1.5 h-9 px-4 py-2 font-medium text-sm text-white">
+                <CheckCircle2 className="h-4 w-4 text-neon-green" />
+                Rewards Claimed!
+                {userClaimedAmount && (
+                  <>
+                    <span className="mx-1">·</span>
+                    <span className="font-bold flex items-center gap-1">
+                      {(parseFloat(userClaimedAmount) / 1e9).toFixed(2)}
+                      <SolanaIcon size="xs" />
+                    </span>
+                  </>
                 )}
               </div>
+            </Card>
+          )}
+        </div>
+      </div>
+
+      <CardContent className="p-0">
+        {loading ? (
+          <div className="min-h-[400px] flex items-center justify-center">
+            <div className="text-center">
+              <svg className="animate-spin h-8 w-8 text-accent mx-auto mb-2" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+              </svg>
+              <p className="text-sm text-muted-foreground">Loading Early Birds...</p>
             </div>
-
-            {/* Social Links */}
-            <div className="border-t border-border/20 pt-4 sm:pt-6">
-              <div className="flex items-center justify-between gap-3 mb-4 sm:mb-6">
-                <div className="flex flex-col gap-1 min-w-0 flex-1">
-                  <Label htmlFor="socials-toggle" className="text-sm">Attach socials?</Label>
-                </div>
-                <Switch
-                  id="socials-toggle"
-                  checked={showSocials}
-                  onCheckedChange={(checked) => {
-                    setShowSocials(checked);
-                    if (!checked) {
-                      setSocialLinks({
-                        website: "",
-                        twitter: "",
-                        telegram: ""
-                      });
-                    }
-                  }}
-                  className="transition-glow data-[state=checked]:bg-accent data-[state=checked]:shadow-glow data-[state=checked]:shadow-accent/40 shrink-0"
-                />
-              </div>
-
-              {showSocials && (
-                <div className="space-y-3 sm:space-y-4">
-                  <div>
-                    <Label className="text-sm">Website (Optional)</Label>
-                    <Input
-                      value={socialLinks.website}
-                      onChange={(e) => {
-                        setSocialLinks(prev => ({ ...prev, website: e.target.value }));
-                        if (errors.website) setErrors(prev => ({ ...prev, website: "" }));
-                      }}
-                      placeholder="https://your-website.com"
-                      className={cn("bg-secondary/20 border-border/20 text-sm h-9 sm:h-10", errors.website && "border-accent/50")}
-                    />
-                    {errors.website && (
-                      <p className="text-xs text-accent mt-1">{errors.website}</p>
+          </div>
+        ) : error ? (
+          <div className="min-h-[400px] flex items-center justify-center">
+            <p className="text-sm text-red-500">{error}</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-5 sm:grid-cols-10 gap-2 sm:gap-3">
+            {seats.map((seat) => {
+              const isUserSeat = userWallet && seat.walletAddress === userWallet;
+              
+              // Build tooltip content with state-specific info
+              const tooltipContent = (seat.isTaken || seat.isDisqualified) ? (
+                <div className="space-y-0.5 text-xs">
+                  {/* Header with position and status badges */}
+                  <div className="flex items-center gap-2 pb-0.5 border-b border-border/50">
+                    <div className="font-bold">Seat #{seat.position}</div>
+                    {isUserSeat && (
+                      <span className="text-[9px] px-1.5 py-0.5 bg-violet-500 text-white rounded font-bold">YOU</span>
+                    )}
+                    {seat.hasClaimed && (
+                      <span className="text-[9px] px-1.5 py-0.5 bg-neon-green text-black rounded font-bold">CLAIMED</span>
+                    )}
+                    {seat.isDisqualified && (
+                      <span className="text-[9px] px-1.5 py-0.5 bg-red-500 text-white rounded font-bold">DISQUALIFIED</span>
                     )}
                   </div>
-
-                  <div>
-                    <Label className="text-sm">Twitter/X (Optional)</Label>
-                    <Input
-                      value={socialLinks.twitter}
-                      onChange={(e) => {
-                        setSocialLinks(prev => ({ ...prev, twitter: e.target.value }));
-                        if (errors.twitter) setErrors(prev => ({ ...prev, twitter: "" }));
-                      }}
-                      placeholder="https://twitter.com/yourusername"
-                      className={cn("bg-secondary/20 border-border/20 text-sm h-9 sm:h-10", errors.twitter && "border-accent/50")}
-                    />
-                    {errors.twitter && (
-                      <p className="text-xs text-accent mt-1">{errors.twitter}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <Label className="text-sm">Telegram (Optional)</Label>
-                    <Input
-                      value={socialLinks.telegram}
-                      onChange={(e) => {
-                        setSocialLinks(prev => ({ ...prev, telegram: e.target.value }));
-                        if (errors.telegram) setErrors(prev => ({ ...prev, telegram: "" }));
-                      }}
-                      placeholder="https://t.me/yourusername"
-                      className={cn("bg-secondary/20 border-border/20 text-sm h-9 sm:h-10", errors.telegram && "border-accent/50")}
-                    />
-                    {errors.telegram && (
-                      <p className="text-xs text-accent mt-1">{errors.telegram}</p>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* First Buy Settings */}
-            <div className="border-t border-border/20 pt-4 sm:pt-6">
-              <div className="flex items-start justify-between gap-3 mb-4 sm:mb-6">
-                <div className="flex flex-col gap-1 min-w-0 flex-1">
-                  <Label htmlFor="first-buy-toggle" className="text-sm">Be the first buyer?</Label>
-                  <p className="text-xs text-muted-foreground leading-relaxed">Helps preventing your coin from being sniped</p>
-                </div>
-                <Switch
-                  id="first-buy-toggle"
-                  checked={showFirstBuy}
-                  onCheckedChange={(checked) => {
-                    setShowFirstBuy(checked);
-                    if (!checked) {
-                      setBuyAmount("");
-                      setMaxSolCost("");
-                      setErrors(prev => ({ ...prev, buyAmount: "", maxSolCost: "" }));
-                    }
-                  }}
-                  className="transition-glow data-[state=checked]:bg-accent data-[state=checked]:shadow-glow data-[state=checked]:shadow-accent/40 shrink-0 mt-0.5"
-                />
-              </div>
-
-              {showFirstBuy && (
-                <div className="space-y-3 sm:space-y-4">
-                  <div>
-                    <Label className="text-sm">Select Amount to Buy</Label>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
-                      {[0.5, 1, 1.5, 2].map((amount) => (
-                      <YoinkButtonSecondary
-                        key={amount}
-                        text={<>
-                          {amount} <SolanaIcon size="xs" className="inline-block ml-0.5" />
-                        </>}
-                        className={cn(
-                          "w-full text-xs sm:text-sm h-8 sm:h-9",
-                          parseFloat(buyAmount) === amount ?
-                            "bg-gradient-to-b from-accent/30 to-accent/20 text-black border-accent/20 shadow-sm" :
-                            "bg-secondary/20 border-border/20"
-                        )}
-                          onClick={() => {
-                            setBuyAmount(amount.toString());
-                            const { maxCostLamports } = calculateTokenAmount(amount);
-                            setMaxSolCost((maxCostLamports / LAMPORTS_PER_SOL).toString());
-                          }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-
-                  {buyAmount && (
-                    <div className="bg-gradient-to-b from-secondary/30 to-secondary/20 p-3 sm:p-4 rounded-lg space-y-2 border border-border/20 shadow-sm">
-                      <div className="flex justify-between text-xs sm:text-sm">
-                        <span className="text-muted-foreground">Selected Amount:</span>
-                        <span className="font-medium">{parseFloat(buyAmount).toFixed(3)} <SolanaIcon size="xs" className="inline-block ml-0.5" /></span>
-                      </div>
-                      <div className="flex justify-between text-xs sm:text-sm">
-                        <span className="text-muted-foreground">Estimated Tokens:</span>
-                        <span className="font-medium">
-                          {buyAmount ? formatNumber(calculateTokenAmount(parseFloat(buyAmount)).tokenAmount / 1e6) : '0'} tokens
-                        </span>
-                      </div>
+                  
+                  {/* Wallet Address */}
+                  {seat.walletAddress && (
+                    <div className="space-y-0">
+                      <div className="text-[10px] text-muted-foreground">Wallet:</div>
+                      <Link href={`/profile/${seat.walletAddress}`} className="font-mono text-[9px] leading-tight hover:underline hover:text-accent">
+                        {seat.walletAddress.substring(0, 5)}...
+                      </Link>
                     </div>
                   )}
-                </div>
-              )}
-            </div>
-
-            {/* Stream Settings */}
-            <div className="border-t border-border/20 pt-4 sm:pt-6">
-              <div className="flex items-start justify-between gap-3 mb-4 sm:mb-6">
-                <div className="flex flex-col gap-1 min-w-0 flex-1">
-                  <Label htmlFor="stream-toggle" className="text-sm">Attach a Twitch stream?</Label>
-                  <p className="text-xs text-muted-foreground leading-relaxed">If you do this, you won't be able to create your own stream later.</p>
-                </div>
-                <Switch
-                  id="stream-toggle"
-                  checked={showStream}
-                  disabled={showVideo}
-                  onCheckedChange={(checked) => {
-                    setShowStream(checked);
-                    if (!checked) {
-                      setStreamTitle("");
-                      setStreamLink("");
-                      setStreamPreview(null);
-                      setTwitchUserId(undefined);
-                      setTwitchUserName(undefined);
-                      setTwitchProfilePicture(undefined);
-                    }
-                  }}
-                  className="transition-glow data-[state=checked]:bg-accent data-[state=checked]:shadow-glow data-[state=checked]:shadow-accent/40 shrink-0 mt-0.5"
-                />
-              </div>
-
-              {showStream && (
-                <div className="space-y-3 sm:space-y-4">
-                  {/* Stream Preview */}
-                  {streamPreview && (
-                    <div className="aspect-video bg-gradient-to-br from-card/80 to-card/60 rounded-lg border border-border/20 shadow-sm relative overflow-hidden">
-                      <img
-                        src={streamPreview}
-                        alt="Stream Preview"
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-background/60 to-transparent" />
-                      <Badge className="absolute top-2 sm:top-3 left-2 sm:left-3 bg-gradient-to-b from-accent/90 to-accent/80 text-black border-accent/30 shadow-sm text-xs">
-                        LIVE PREVIEW
-                      </Badge>
-                      {streamTitle && (
-                        <div className="absolute bottom-2 sm:bottom-3 left-2 sm:left-3 right-2 sm:right-3">
-                          <h3 className="text-sm sm:text-lg font-semibold text-foreground mb-1">
-                            {streamTitle}
-                          </h3>
+                  
+                  {/* Balance */}
+                  {seat.balance > 0 && !seat.isDisqualified && (
+                    <div className="space-y-0">
+                      <div className="text-[10px] text-muted-foreground">Balance:</div>
+                      <div className="font-semibold">{formatNumber(seat.balance)} tokens</div>
+                    </div>
+                  )}
+                  
+                  {/* Joined Date */}
+                  {seat.firstBuyTimestamp && (
+                    <div className="space-y-0">
+                      <div className="text-[10px] text-muted-foreground">Joined:</div>
+                      <div>{timeAgo(seat.firstBuyTimestamp)}</div>
+                    </div>
+                  )}
+                  
+                  {/* Claimed Info */}
+                  {seat.hasClaimed && seat.claimedAmount && (
+                    <div className="space-y-0 pt-0.5 border-t border-neon-green/30">
+                      <div className="text-[10px] text-neon-green">Rewards Claimed:</div>
+                      <div className="text-neon-green font-bold text-sm flex items-center gap-1">
+                        {(parseFloat(seat.claimedAmount) / 1e9).toFixed(4)}
+                        <SolanaIcon size="xs" />
+                      </div>
+                      {seat.claimedAt && (
+                        <div className="text-[10px] text-neon-green/70">
+                          {timeAgo(seat.claimedAt)}
                         </div>
                       )}
                     </div>
                   )}
-
-                  <div>
-                    <Label className="text-sm">Stream Title</Label>
-                    <Input
-                      value={streamTitle}
-                      onChange={(e) => {
-                        setStreamTitle(e.target.value);
-                        if (errors.streamTitle) setErrors(prev => ({ ...prev, streamTitle: "" }));
-                      }}
-                      placeholder="Enter your stream title"
-                      className={cn("bg-secondary/20 border-border/20 text-sm h-9 sm:h-10", errors.streamTitle && "border-accent/50")}
-                    />
-                    {errors.streamTitle && (
-                      <p className="text-xs text-accent mt-1">{errors.streamTitle}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <Label className="text-sm">Stream Link (Optional)</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        value={streamLink}
-                        onChange={(e) => setStreamLink(e.target.value)}
-                        placeholder="e.g., https://twitch.tv/yourusername"
-                        className="bg-secondary/20 border-border/20 text-sm h-9 sm:h-10"
-                      />
-                      <YoinkButtonSecondary
-                        text=""
-                        className="flex items-center justify-center w-8 sm:w-10 h-9 sm:h-10"
-                        onClick={async () => {
-                          if (!streamLink) return;
-                          try {
-                            const result = await getCreatorStatusByUrl(streamLink);
-                            if (!result) {
-                              toast({
-                                title: "Error",
-                                description: "Could not find stream information",
-                                className: "bg-accent/10 border-accent/20 text-accent",
-                              });
-                              return;
-                            }
-
-                            if (result.status?.live) {
-                              const stream = result.status.stream;
-                              setStreamTitle(stream.title);
-                              setTwitchUserId(stream.userId);
-                              setTwitchUserName(stream.userName);
-                              // Get profile picture from creator data
-                              if (result.creator?.profileImageUrl) {
-                                setTwitchProfilePicture(result.creator.profileImageUrl);
-                              }
-                              if (stream.thumbnailUrl) {
-                                const thumbnailUrl = stream.thumbnailUrl.replace('{width}x{height}', '1920x1080');
-                                setStreamPreview(thumbnailUrl);
-                              }
-                              toast({
-                                title: "Success",
-                                description: "Stream information loaded",
-                              });
-                            } else {
-                              toast({
-                                title: "Stream Offline",
-                                description: "The stream is currently offline.",
-                              });
-                              setStreamPreview(null);
-                            }
-                          } catch (error) {
-                            toast({
-                              title: "Error",
-                              description: "Failed to fetch stream information",
-                              className: "bg-accent/10 border-accent/20 text-accent",
-                            });
-                          }
-                        }}
-                        disabled={!streamLink}
-                        icon={<RefreshCw className={`h-3 w-3 sm:h-4 sm:w-4 ${streamLoading ? 'animate-spin' : ''}`} />}
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">Your streaming platform URL</p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Video Attachment Section */}
-            <div className="border-t border-border/20 pt-4 sm:pt-6">
-              <div className="flex items-start justify-between gap-3 mb-4 sm:mb-6">
-                <div className="flex flex-col gap-1 min-w-0 flex-1">
-                  <Label htmlFor="video-toggle" className="text-sm">Attach a Video?</Label>
-                  <p className="text-xs text-muted-foreground leading-relaxed">Upload a video to showcase your coin (max 100MB).</p>
-                </div>
-                <Switch
-                  id="video-toggle"
-                  checked={showVideo}
-                  disabled={showStream}
-                  onCheckedChange={(checked) => {
-                    setShowVideo(checked);
-                    if (!checked) {
-                      setSelectedVideo(null);
-                      setVideoPreview(null);
-                      setVideoIpfsUrl(null);
-                      setErrors(prev => ({ ...prev, video: "" }));
-                    }
-                  }}
-                  className="transition-glow data-[state=checked]:bg-accent data-[state=checked]:shadow-glow data-[state=checked]:shadow-accent/40 shrink-0 mt-0.5"
-                />
-              </div>
-
-              {showVideo && (
-                <div className="space-y-3 sm:space-y-4">
-                  {/* Video Preview */}
-                  {videoPreview && (
-                    <div className="relative rounded-lg overflow-hidden border border-border/20 shadow-sm bg-gradient-to-br from-secondary/30 to-secondary/20">
-                      <div className="aspect-video bg-black/40 relative overflow-hidden">
-                        <video
-                          src={videoPreview}
-                          controls
-                          className="w-full h-full object-contain"
-                        />
-                        <Badge className="absolute top-2 sm:top-3 left-2 sm:left-3 bg-gradient-to-b from-accent/90 to-accent/80 text-black border-accent/30 shadow-md text-xs">
-                          VIDEO PREVIEW
-                        </Badge>
-                      </div>
+                  
+                  {/* Disqualified Info */}
+                  {seat.isDisqualified && (
+                    <div className="space-y-0 pt-0.5 border-t border-red-500/30">
+                      <div className="text-red-400 font-semibold">❌ Disqualified</div>
+                      <div className="text-[10px] text-red-400/70">Paper Hands Penalty - Sold tokens</div>
+                      {seat.lastUpdated && (
+                        <div className="text-[10px] text-red-400/50">
+                          {timeAgo(seat.lastUpdated)}
+                        </div>
+                      )}
                     </div>
                   )}
-
-                  {/* Video Upload Area */}
-                  <div className="relative">
-                    {!videoPreview ? (
-                      <div 
-                        onClick={() => !uploadingVideo && document.getElementById('videoInput')?.click()}
-                        onDragOver={handleDragOver}
-                        onDragLeave={handleDragLeave}
-                        onDrop={handleDrop}
-                        className={cn(
-                          "relative border-2 border-dashed rounded-lg p-6 sm:p-8 cursor-pointer transition-all duration-200",
-                          uploadingVideo 
-                            ? "border-accent/40 bg-accent/5 cursor-not-allowed" 
-                            : isDragging
-                              ? "border-accent bg-gradient-to-br from-accent/10 to-accent/5 shadow-glow scale-[1.02]"
-                              : "border-border/30 bg-gradient-to-br from-secondary/20 to-secondary/10 hover:border-accent/50 hover:bg-gradient-to-br hover:from-accent/5 hover:to-accent/10 hover:shadow-glow-sm",
-                          errors.video && "border-accent/60"
-                        )}
-                      >
-                        <input
-                          type="file"
-                          id="videoInput"
-                          className="hidden"
-                          accept="video/*"
-                          onChange={handleVideoChange}
-                          disabled={uploadingVideo}
-                        />
-                        
-                        <div className="flex flex-col items-center justify-center text-center space-y-3">
-                          {uploadingVideo ? (
-                            <>
-                              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-accent/20 to-accent/10 border-2 border-accent/30 flex items-center justify-center">
-                                <Loader2 className="h-6 w-6 sm:h-7 sm:w-7 text-accent animate-spin" />
-                              </div>
-                              <div className="space-y-1">
-                                <p className="text-sm font-medium text-foreground">Uploading to IPFS...</p>
-                                <p className="text-xs text-muted-foreground">Please wait while we process your video</p>
-                              </div>
-                            </>
-                          ) : (
-                            <>
-                              <div className={cn(
-                                "w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-accent/20 to-accent/10 border-2 border-accent/30 flex items-center justify-center transition-all duration-200",
-                                isDragging ? "scale-110" : "hover:scale-105"
-                              )}>
-                                <svg className="h-6 w-6 sm:h-7 sm:w-7 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                </svg>
-                              </div>
-                              <div className="space-y-1">
-                                <p className={cn(
-                                  "text-sm font-medium transition-colors duration-200",
-                                  isDragging ? "text-accent" : "text-foreground"
-                                )}>
-                                  {isDragging ? "Drop your video here" : "Click to upload or drag and drop"}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  MP4, WebM, AVI, MOV up to 100MB
-                                </p>
-                              </div>
-                            </>
-                          )}
-                        </div>
+                </div>
+              ) : (
+                <div className="text-xs space-y-1">
+                  <div className="font-bold">Seat #{seat.position}</div>
+                  {(isBonded || isPendingBonding) ? (
+                    <>
+                      <div className="text-muted-foreground">🔒 Seat Closed</div>
+                      <div className="text-[10px] text-muted-foreground/70">Bonding completed - No longer available</div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-muted-foreground">🔓 Available</div>
+                      <div className="text-[10px] text-muted-foreground/70">Be one of the first 50 buyers!</div>
+                    </>
+                  )}
+                </div>
+              );
+              
+              return (
+                <Tooltip key={seat.position}>
+                  <TooltipTrigger asChild>
+                <div
+                  className={`
+                    relative aspect-square rounded-lg border-2 transition-all duration-300 ease-out
+                    hover:scale-105 hover:-translate-y-1 hover:shadow-xl
+                    ${seat.isTaken 
+                      ? seat.hasClaimed
+                        ? 'bg-neon-green/20 border-neon-green shadow-lg shadow-neon-green/50 hover:shadow-neon-green/70'
+                        : isUserSeat
+                          ? 'bg-violet-500/20 border-violet-400 shadow-lg shadow-violet-500/50 hover:shadow-violet-500/70'
+                          : 'bg-accent/20 border-accent shadow-lg shadow-accent/50 hover:shadow-accent/70'
+                      : seat.isDisqualified
+                        ? 'bg-red-900/20 border-red-500/30 hover:shadow-red-500/40'
+                        : 'bg-secondary/20 border-border/30 hover:shadow-secondary/40'
+                    }
+                  `}
+                >
+                  {seat.isTaken ? (
+                    <div className="w-full h-full flex flex-col items-center justify-center p-1">
+                      {/* Seat number badge in top left corner */}
+                      <div className={`absolute top-0 left-0 ${seat.hasClaimed ? 'bg-neon-green/80 text-black' : isUserSeat ? 'bg-violet-500/80' : 'bg-accent/80'} text-background text-[8px] px-1 rounded-br-md rounded-tl-md font-bold z-10`}>
+                        #{seat.position}
                       </div>
-                    ) : (
-                      <div className="flex items-center justify-between p-3 sm:p-4 rounded-lg bg-gradient-to-br from-secondary/30 to-secondary/20 border border-border/20 shadow-sm">
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-accent/20 to-accent/10 border border-accent/30 flex items-center justify-center flex-shrink-0">
-                            <svg className="h-5 w-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                            </svg>
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-foreground truncate">
-                              {selectedVideo?.name || 'Video file'}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {selectedVideo && (selectedVideo.size / (1024 * 1024)).toFixed(2)} MB
-                            </p>
-                          </div>
+                      
+                      {/* User badge in top right corner */}
+                      {isUserSeat && (
+                        <div className="absolute top-0 right-0 bg-violet-500 text-white text-[8px] px-1 rounded-bl-md rounded-tr-md font-bold">
+                          YOU
                         </div>
-                        <button
-                          onClick={() => {
-                            setSelectedVideo(null);
-                            setVideoPreview(null);
-                            setVideoIpfsUrl(null);
-                            setErrors(prev => ({ ...prev, video: "" }));
-                            const input = document.getElementById('videoInput') as HTMLInputElement;
-                            if (input) input.value = '';
-                          }}
-                          className="h-8 w-8 rounded-md bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 hover:border-red-500/50 flex items-center justify-center transition-all duration-200 flex-shrink-0"
-                          title="Remove video"
+                      )}
+                      
+                      {/* Memish neon green checkmark for claimed seats */}
+                      {seat.hasClaimed && (
+                        <svg 
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="absolute inset-0 w-full h-full pointer-events-none z-30" 
+                          viewBox="0 0 140 100"
+                          role="img"
                         >
-                          <svg className="h-4 w-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
+                          <title>Memish neon green checkmark</title>
+
+                          {/* faint glow / shadow */}
+                          <path d="M20 60 
+                                   L50 85 
+                                   L120 20"
+                                fill="none"
+                                stroke="#10b981"
+                                strokeWidth="16"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                opacity="0.2"/>
+
+                          {/* main neon check */}
+                          <path d="M20 60 
+                                   L50 85 
+                                   L120 20"
+                                fill="none"
+                                stroke="#10b981"
+                                strokeWidth="12"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"/>
+
+                          {/* hand-drawn wobble */}
+                          <path d="M19 61 L51 84 L119 21"
+                                fill="none"
+                                stroke="#10b981"
+                                strokeWidth="6"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                opacity="0.8"/>
+                        </svg>
+                      )}
+                      
+                      {/* Profile picture - clickable */}
+                      <EarlyBirdSeatAvatar
+                        walletAddress={seat.walletAddress!}
+                        position={seat.position}
+                        hasClaimed={seat.hasClaimed}
+                      />
+                      
+                      {/* Wallet address - first 5 characters - clickable */}
+                      <Link 
+                        href={`/profile/${seat.walletAddress}`}
+                        className={`text-[8px] sm:text-[9px] font-mono ${seat.hasClaimed ? 'text-neon-green' : isUserSeat ? 'text-violet-400/90' : 'text-accent/70'} hover:underline z-20`}
+                      >
+                        {seat.walletAddress!.substring(0, 5)}
+                      </Link>
+                    </div>
+                  ) : seat.isDisqualified ? (
+                    // Disqualified seat - show hand-drawn X overlay with user info preserved
+                    <div className="w-full h-full flex flex-col items-center justify-center p-1 relative">
+                      {/* Seat number in top left corner */}
+                      <div className="absolute top-0 left-0 bg-red-900/80 text-red-200 text-[8px] px-1 rounded-br-md rounded-tl-md font-bold z-10">
+                        #{seat.position}
                       </div>
-                    )}
+                      
+                      {/* User badge in top right corner (if it's the user's disqualified seat) */}
+                      {isUserSeat && (
+                        <div className="absolute top-0 right-0 bg-red-600 text-white text-[8px] px-1 rounded-bl-md rounded-tr-md font-bold z-10">
+                          YOU
+                        </div>
+                      )}
+                      
+                      {/* User profile picture (grayed out) - clickable */}
+                      {seat.walletAddress ? (
+                        <EarlyBirdSeatAvatar
+                          walletAddress={seat.walletAddress}
+                          position={seat.position}
+                          isDisqualified={true}
+                        />
+                      ) : (
+                        <img
+                          src={getDefaultProfilePicture(String(seat.position))}
+                          alt={`Disqualified Seat ${seat.position}`}
+                          className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border border-red-500/30 mb-1 opacity-30 grayscale"
+                        />
+                      )}
+                      
+                      {/* Wallet address - first 5 characters - clickable */}
+                      {seat.walletAddress ? (
+                        <Link 
+                          href={`/profile/${seat.walletAddress}`}
+                          className="text-[8px] sm:text-[9px] font-mono text-red-500/50 hover:text-red-500/70 hover:underline z-20"
+                        >
+                          {seat.walletAddress.substring(0, 5)}
+                        </Link>
+                      ) : (
+                        <div className="text-[8px] sm:text-[9px] font-mono text-red-500/50">
+                          -----
+                        </div>
+                      )}
+                      
+                      {/* Human hand-drawn red cross */}
+                      <svg 
+                        className="absolute inset-0 w-full h-full pointer-events-none" 
+                        viewBox="0 0 120 120"
+                      >
+                        <defs>
+                          <filter id="rough" x="-30%" y="-30%" width="160%" height="160%">
+                            <feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="3" seed="22" result="noise"/>
+                            <feDisplacementMap in="SourceGraphic" in2="noise" scale="3.2" xChannelSelector="R" yChannelSelector="G"/>
+                          </filter>
+                        </defs>
+
+                        {/* slightly irregular, hand-like lines */}
+                        <path 
+                          d="M 28 28 C 38 36, 46 44, 56 54 C 66 62, 72 70, 86 84 C 88 86, 92 88, 94 92"
+                          fill="none"
+                          stroke="#d62828"
+                          strokeWidth="5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          filter="url(#rough)"
+                          opacity="0.96"
+                        />
+                        <path 
+                          d="M 94 26 C 84 36, 74 46, 62 60 C 54 68, 44 78, 30 92 C 28 94, 26 96, 26 98"
+                          fill="none"
+                          stroke="#d62828"
+                          strokeWidth="5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          filter="url(#rough)"
+                          opacity="0.96"
+                        />
+
+                        {/* subtle dot imperfections to mimic a pen touch */}
+                        <circle cx="31" cy="27" r="1.3" fill="#d62828" opacity="0.9"/>
+                        <circle cx="94" cy="26" r="1.1" fill="#d62828" opacity="0.9"/>
+                        <circle cx="88" cy="88" r="1.2" fill="#d62828" opacity="0.8"/>
+                        <circle cx="29" cy="94" r="1.2" fill="#d62828" opacity="0.8"/>
+                      </svg>
+                    </div>
+                  ) : (
+                    // Available seat
+                    <div className="w-full h-full flex flex-col items-center justify-center p-1">
+                      <Lock className="h-4 w-4 sm:h-6 sm:w-6 text-muted-foreground/40 mb-1" />
+                      <div className="text-[8px] sm:text-[10px] font-medium text-muted-foreground/60">#{seat.position}</div>
+                    </div>
+                  )}
+                </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs">
+                    {tooltipContent}
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })}
+          </div>
+        )}
+
+        {!loading && !error && (
+          <>
+            <div className="mt-6 p-4 bg-secondary/20 rounded-lg">
+              <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                <Trophy className="h-4 w-4 text-amber-500" />
+                Early Bird Details
+              </h4>
+              <div className="space-y-3">
+                {seats
+                  .filter((s) => s.isTaken)
+                  .map((seat) => {
+                    const isUserSeat = userWallet && seat.walletAddress === userWallet;
                     
-                    {/* Status Messages */}
-                    {uploadingVideo && (
-                      <div className="mt-2 p-2 rounded-md bg-accent/10 border border-accent/20">
-                        <p className="text-xs text-accent flex items-center gap-2">
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                          Uploading to IPFS... This may take a moment
-                        </p>
+                    return (
+                      <div
+                        key={seat.position}
+                        className={`flex items-center justify-between p-2 sm:p-3 rounded-lg ${
+                          isUserSeat ? 'bg-accent/10 border border-accent/30' : 'bg-secondary/30'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <div className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-accent/20 text-accent font-bold text-xs sm:text-sm">
+                            #{seat.position}
+                          </div>
+                          <EarlyBirdLeaderboardAvatar
+                            walletAddress={seat.walletAddress!}
+                            position={seat.position}
+                          />
+                          <div className="flex flex-col">
+                            <Link 
+                              href={`/profile/${seat.walletAddress}`}
+                              className="font-mono text-xs sm:text-sm font-medium hover:text-accent transition-colors"
+                            >
+                              {formatAddress(seat.walletAddress!)}
+                              {isUserSeat && (
+                                <span className="ml-2 text-[10px] bg-accent text-background px-2 py-0.5 rounded-full font-bold">
+                                  YOU
+                                </span>
+                              )}
+                            </Link>
+                            <a
+                              href={`https://solscan.io/account/${seat.walletAddress}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[10px] text-muted-foreground hover:text-accent flex items-center gap-1"
+                            >
+                              <svg width="12" height="12" viewBox="0 0 316 315" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <g clipPath="url(#clip0_15320_6385)">
+                                  <path d="M157.501 -0.375009C158.243 -0.3738 158.986 -0.372592 159.751 -0.371347C200.901 -0.19058 238.327 15.5969 268.001 44C268.795 44.7309 269.589 45.4618 270.407 46.2148C299.639 74.0132 314.085 114.372 316.001 154C316.043 154.866 316.086 155.732 316.129 156.625C317.036 195.299 303.157 231.777 277.001 260C272.034 255.884 267.588 251.579 263.251 246.812C258.943 242.131 254.59 237.533 250.063 233.062C245.827 228.877 241.829 224.56 238.001 220C239.494 215.902 241.505 212.358 243.751 208.625C258.049 184.089 261.052 157.294 253.876 130C247.036 105.774 231.076 84.526 209.251 71.875C185.025 58.3674 158.112 53.5756 131.001 61C105.763 68.7927 83.7433 84.5134 70.9019 108.01C58.1815 132.403 54.1314 159.243 62.1256 185.875C70.2872 211.566 87.1832 233.11 111.001 246C136.273 258.52 161.194 259.401 188.125 252.452C190.247 251.941 192.193 251.796 194.376 251.75C195.47 251.711 195.47 251.711 196.587 251.672C203.77 252.648 208.21 257.811 213.024 262.73C213.77 263.481 214.516 264.231 215.285 265.004C217.656 267.392 220.016 269.789 222.376 272.188C223.986 273.813 225.596 275.437 227.208 277.061C231.147 281.033 235.077 285.013 239.001 289C237.172 293.096 234.662 294.969 230.938 297.312C230.016 297.897 230.016 297.897 229.075 298.493C208.561 311.04 185.304 315.442 161.563 315.375C160.771 315.374 159.978 315.373 159.162 315.371C119.658 315.208 81.7949 301.088 52.0006 275C51.1511 274.283 50.3016 273.567 49.4264 272.828C43.1832 267.436 38.0125 261.54 33.0006 255C32.3212 254.125 31.6419 253.249 30.942 252.348C14.9048 231.058 4.95175 206.294 1.00058 180C0.816245 178.802 0.631909 177.605 0.441987 176.371C-4.60214 134.33 7.93634 92.1714 33.7896 58.9648C59.598 26.653 96.2021 6.05584 137.122 0.414542C143.913 -0.311258 150.679 -0.395715 157.501 -0.375009Z" fill="#00E8B5" />
+                                  <path d="M197.996 108.172C209.455 118.008 217.931 131.94 220 147C221.423 167.213 218.076 184.808 204.625 200.5C192.888 212.619 177.288 219.847 160.402 220.354C142.737 220.513 127.002 215.572 114.062 203.26C101.611 190.821 95.117 175.085 94.625 157.5C95.1486 140.845 100.967 125.086 112.727 113.105C137.096 90.5362 171.111 88.6825 197.996 108.172Z" fill="#C74AE3" />
+                                </g>
+                              </svg>
+                              View on Solscan
+                            </a>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="flex items-center justify-end gap-1 text-xs sm:text-sm font-semibold">
+                            {tokenImage && (
+                              <img 
+                                src={tokenImage} 
+                                alt={tokenSymbol}
+                                className="w-4 h-4 rounded-full"
+                              />
+                            )}
+                            {formatNumber(seat.balance)} <span className="text-accent">{tokenSymbol}</span>
+                          </div>
+                        </div>
                       </div>
-                    )}
-                    {errors.video && (
-                      <div className="mt-2 p-2 rounded-md bg-accent/10 border border-accent/20">
-                        <p className="text-xs text-accent">{errors.video}</p>
-                      </div>
-                    )}
-                    {videoIpfsUrl && !uploadingVideo && !errors.video && (
-                      <div className="mt-2 p-2 rounded-md bg-gradient-to-br from-green-500/10 to-green-500/5 border border-green-500/20">
-                        <p className="text-xs text-green-500 flex items-center gap-2">
-                          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                          Video uploaded successfully!
-                        </p>
-                      </div>
-                    )}
+                    );
+                  })}
+                
+                {takenSeats === 0 && (
+                  <div className="text-center py-8 text-sm text-muted-foreground">
+                    <Trophy className="h-12 w-12 text-muted-foreground/30 mx-auto mb-2" />
+                    <p>No Early Birds yet! Be among the first 50 buyers to earn rewards!</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Disqualification Warning */}
+            {disqualifiedSeats > 0 && (
+              <div className="mt-4 p-4 bg-red-900/10 border border-red-500/30 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <X className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="text-sm font-semibold text-red-500 mb-1">
+                      Paper Hands Penalty
+                    </h4>
+                    <p className="text-xs text-muted-foreground">
+                      {disqualifiedSeats} seat{disqualifiedSeats > 1 ? 's were' : ' was'} disqualified. 
+                      Early Birds who sell their tokens lose their seat permanently and cannot reclaim it. 
+                      Hold your tokens to keep earning rewards! 💎🙌
+                    </p>
                   </div>
                 </div>
-              )}
-            </div>
-          </div>
-        </Card>
-
-        {/* Token Preview */}
-        <Card className="p-3 sm:p-4 shadow-sm space-y-3 sm:space-y-4">
-          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3 sm:gap-4">
-            {imagePreview ? (
-              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full border-2 border-accent/20 overflow-hidden flex items-center justify-center bg-gradient-to-b from-secondary/40 to-secondary/20 shadow-sm shrink-0">
-                <img
-                  src={imagePreview}
-                  alt="Token Preview"
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            ) : (
-              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gradient-to-b from-secondary/40 to-secondary/20 border-2 border-accent/20 shadow-sm flex items-center justify-center shrink-0">
-                <Coins className="w-6 h-6 sm:w-8 sm:h-8 text-accent/50" />
               </div>
             )}
-            <div className="text-center sm:text-left flex-1 min-w-0">
-              <h3 className="text-base sm:text-lg font-semibold text-foreground truncate">
-                {tokenName || "Your Token Name"}
-                {tokenSymbol && (
-                  <span className="ml-2 text-sm text-muted-foreground">
-                    ${tokenSymbol}
-                  </span>
-                )}
-              </h3>
-              <p className="text-sm text-muted-foreground break-words">
-                {tokenDescription || "Your token description will appear here"}
-              </p>
-            </div>
-          </div>
-        </Card>
-
-        <div className="flex justify-center pt-2">
-          <YoinkButton
-            text={isCreating ? "Creating..." : "Create Coin"}
-            onClick={async () => {
-              if (!validateForm()) return;
-
-              // Validate buy inputs if first buy is enabled
-              if (showFirstBuy) {
-                const newErrors = { ...errors };
-                if (!buyAmount || parseFloat(buyAmount) <= 0) {
-                  newErrors.buyAmount = "Please enter a valid amount";
-                }
-                if (!maxSolCost || parseFloat(maxSolCost) <= 0) {
-                  newErrors.maxSolCost = "Please enter a valid maximum SOL amount";
-                }
-                setErrors(newErrors);
-                if (newErrors.buyAmount || newErrors.maxSolCost) return;
-              }
-              try {
-                setIsCreating(true);
-                if (!createCoin) throw new Error("PumpProvider not properly initialized");
-                if (!selectedImage) {
-                  setErrors(prev => ({ ...prev, image: "Please select an image" }));
-                  return;
-                }
-
-                const formData = new FormData();
-                formData.append('file', selectedImage);
-                const imageResponse = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/posts/upload-image/temp`, {
-                  method: 'POST',
-                  body: formData,
-                });
-
-                if (!imageResponse.ok) throw new Error('Failed to upload image');
-                const { url: imageUrl } = await imageResponse.json();
-
-                // Convert amounts to BN for createCoin
-                // Token amount is already in raw units, maxSolCost is in lamports
-                const { tokenAmount, maxCostLamports } = showFirstBuy ?
-                  calculateTokenAmount(parseFloat(buyAmount)) :
-                  { tokenAmount: 0, maxCostLamports: 0 };
-
-                console.log('Creating coin with:', {
-                  tokenAmount: tokenAmount.toString(),
-                  maxCostLamports: maxCostLamports.toString(),
-                  buyAmount,
-                  maxSolCost
-                });
-
-                console.log('Creating coin with:', {
-                  tokenAmount: tokenAmount.toString(),
-                  maxCostLamports: maxCostLamports.toString(),
-                  buyAmount,
-                  maxSolCost
-                });
-
-                const result = await createCoin(
-                  tokenName,
-                  tokenSymbol,
-                  imageUrl,
-                  tokenDescription,
-                  twitchUserName || tokenName,
-                  streamLink,
-                  new Date().toISOString(),
-                  JSON.stringify({
-                    title: streamTitle,
-                    userId: twitchUserId,
-                    thumbnailUrl: streamPreview,
-                    streamerProfilePicture: twitchProfilePicture,
-                    fullStatus: { live: true, stream: { thumbnailUrl: streamPreview } },
-                    socialLinks,
-                    videoLink: videoIpfsUrl || ''
-                  }),
-                  undefined,
-                  showFirstBuy,
-                  tokenAmount,
-                  maxCostLamports,
-                  twitchUserId,
-                  showStream ? 'twitch' : 'none', // Only set platform to 'twitch' if a stream is attached
-                  undefined
-                );
-
-                if (result.success) {
-                  // Track successful token creation
-                  trackEvent('Creator', 'Create Token', tokenSymbol, showFirstBuy ? parseFloat(buyAmount) : 0);
-
-                  toast({
-                    title: "Success!",
-                    description: "Your token has been created successfully.",
-                  });
-                  
-                  // Show loader for 5 seconds before redirecting
-                  setShowSuccessLoader(true);
-                  setIsCreating(false);
-                  
-                  setTimeout(() => {
-                    if ((result as any).mintAddress) {
-                      router.push(`/coin/${(result as any).mintAddress}`);
-                    }
-                  }, 5000);
-                } else {
-                  throw new Error((result as any).error || "Failed to create token");
-                }
-              } catch (error) {
-                // Track token creation error
-                trackEvent('Creator', 'Create Token Error', error instanceof Error ? error.message : 'Unknown', 0);
-
-                toast({
-                  title: "Error",
-                  description: error instanceof Error ? error.message : "Failed to create token",
-                  className: "bg-accent/10 border-accent/20 text-accent",
-                });
-              } finally {
-                setIsCreating(false);
-              }
-            }}
-            disabled={isCreating || !tokenName || !tokenSymbol || !tokenDescription || (showStream && !streamTitle)}
-            className="h-10 sm:h-12 px-6 sm:px-8 text-sm sm:text-base min-w-[140px] sm:min-w-[160px]"
-          />
-        </div>
-        </div>
-      )}
+          </>
+        )}
+      </CardContent>
     </div>
+    </TooltipProvider>
   );
 }
