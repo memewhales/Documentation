@@ -1,12 +1,12 @@
 # 🐦 Early Birds
 
 For every token created on the platform, Yoink introduces an **innovative mechanic** that rewards long-term holders and true believers in the asset.  
-**Early Birds ** reward the first buyers with claimable **SOL bonuses**, based on their entry time into a coin (the moment of their first buy).  
+**Early Birds** reward the first buyers with claimable **SOL bonuses**, based on their entry time into a coin (the moment of their first buy).  
 All fees allocated to the **Early Bird Pool** (see [Fees Settings](fees.md)) are proportionally distributed among the remaining valid seats at the time of **graduation**.
 
 <figure><img src="../.gitbook/assets/earlyb1.png" alt=""><figcaption></figcaption></figure>
 
-## 🎯 How Early Seats Work
+## 🎯 How Early Birds Work
 
 ### First-Mover Advantage
 

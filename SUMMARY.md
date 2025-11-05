@@ -20,7 +20,7 @@
 
 * [💰 Autobuyback](features/autobuyback.md)
 * [🔥 Constant Burn](features/constant-burn.md)
-* [🪑 Early Seats](features/early-seats.md)
+* [🐦 Early Birds](features/early-seats.md)
 
 ## 🔧 SDK & Integrations
 
