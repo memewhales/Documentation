@@ -35,17 +35,5 @@ Follow us for:
 
 ---
 
-## �️ Stay Safe
 
-**Only trust official Yoink domains:**
-- ✅ **yoink.now** - Main platform
-- ✅ **app.yoink.now** - Trading interface  
-- ✅ **docs.yoink.now** - Documentation
-
-{% hint style="warning" %}
-**Beware of scams:** Always verify URLs before connecting your wallet. We will never ask for your private keys or seed phrases.
-{% endhint %}
-
----
-
-**🚀 Join us in building the future of creator capital markets!**
+**🚀 Join us in building the future of attention capital markets!**
