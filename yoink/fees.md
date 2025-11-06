@@ -21,9 +21,11 @@ Yoink uses a transparent, fair fee system that benefits all participants in the 
 ## Total Transaction Fee
 
 {% hint style="info" %}
-**4% fee on all buy and sell transactions**
+### 4% fee on all buy and sell transactions
 
 This single fee is automatically split among multiple parties to create a sustainable, community-driven ecosystem.
+
+**Important:** All fees (except platform fee) are specific to each individual token and support that token's own ecosystem.
 {% endhint %}
 
 ## Fee Distribution Breakdown
@@ -33,11 +35,30 @@ Every transaction on Yoink incurs a **4% fee** that is distributed as follows:
 | Recipient | Percentage | Purpose |
 |-----------|------------|---------|
 | **Platform** | 1.0% | Platform operations & $YOINK buyback |
-| **Creator** | 0.8% | Token creator earnings |
-| **Early Bird Pool** | 1.2% | Rewards for first 20 buyers |
-| **Treasury** | 1.0% | Automatic buyback mechanism |
+| **Creator** | 0.8% | Token creator earnings *(for this specific token)* |
+| **Early Bird Pool** | 1.2% | Rewards for first 20 buyers *(of this token only)* |
+| **Treasury** | 1.0% | Automatic buyback mechanism *(for this token only)* |
 
-### 1. Platform Fee (1%)
+{% hint style="warning" %}
+### Token-Specific Fees
+
+**Creator Fee (0.8%)**, **Early Bird Pool (1.2%)**, and **Treasury (1%)** are all token-specific. 
+
+When you trade Token ABC:
+- Creator fee → Goes to Token ABC's creator
+- Early Birds → Shared by Token ABC's first 20 buyers
+- Treasury → Used to buyback and burn Token ABC
+
+**Only the 1% platform fee is shared across the entire Yoink ecosystem.**
+{% endhint %}
+
+---
+
+## Understanding Each Fee Component
+
+### 1. Platform Fee (1%) 🏢
+
+**Scope:** Platform-wide (not token-specific)
 
 The 1% platform fee is further split 50-50:
 
@@ -45,72 +66,127 @@ The 1% platform fee is further split 50-50:
 * **0.5%** → $YOINK Buyback Wallet (flywheel mechanism)
 
 {% hint style="success" %}
-**Flywheel Effect**: Half of all platform fees automatically buy back $YOINK tokens, creating constant buying pressure and value accrual for $YOINK holders.
+**💡 Flywheel Effect**
+
+Half of all platform fees automatically buy back $YOINK tokens, creating constant buying pressure and value accrual for $YOINK holders.
+
+[Learn more about the $YOINK Flywheel →](../usdyoink/constant-buyback.md)
 {% endhint %}
 
-### 2. Creator Fee (0.8%)
+---
 
-* Goes directly to the token creator
+### 2. Creator Fee (0.8%) 👤
+
+**Scope:** Token-specific (goes to that token's creator)
+
+* Goes directly to the token creator's wallet
 * Same rate as pump.fun (we compensate via user pool)
 * Continues even after token graduates to Raydium
-* Incentivizes quality token creation
+* Incentivizes quality token creation and ongoing promotion
 
-### 3. Early Bird Pool (1.2%)
+{% hint style="info" %}
+**Example:** If you trade $DOGE token, the 0.8% creator fee goes to $DOGE's creator, not other token creators.
 
-* Shared among the first 20 buyers of each token
+[Learn more about creating tokens →](how-to-create-a-coin.md)
+{% endhint %}
+
+---
+
+### 3. Early Bird Pool (1.2%) 🐦
+
+**Scope:** Token-specific (only for that token's early birds)
+
+* Shared among the **first 20 buyers** of each specific token
 * Rewards early supporters and risk-takers
-* Claimable after holding for required period
+* Claimable after holding requirements are met
 * Creates incentive for early discovery
 
-### 4. Treasury Pool (1%)
+{% hint style="info" %}
+**Example:** If you're one of the first 20 buyers of $PEPE token, you earn from all future $PEPE trades. Other tokens' trades don't affect your earnings.
 
-* Funds the automatic buyback mechanism
+[Learn more about Early Birds →](../features/early-seats.md)
+{% endhint %}
+
+---
+
+### 4. Treasury Pool (1%) 💰
+
+**Scope:** Token-specific (buybacks only that token)
+
+* Funds the automatic buyback mechanism **for that specific token**
 * Used to buy and burn tokens when price drops below EMA
-* Grows with trading volume
-* Creates price support for all tokens
+* Grows with that token's trading volume
+* Creates price support specific to that token
+
+{% hint style="info" %}
+**Example:** When you trade $CAT token, the 1% treasury fee builds $CAT's buyback fund. This fund only buys and burns $CAT tokens, not other tokens.
+
+[Learn more about Autobuyback →](../features/autobuyback.md)
+{% endhint %}
+
+---
+
+---
 
 ## Fee Examples
 
-### Example 1: 10 SOL Buy Transaction
+### Example 1: 10 SOL Buy Transaction on $DOGE Token
 
 ```
 Total Fee: 0.4 SOL (4%)
 
 Distribution:
-├─ Platform: 0.1 SOL (1%)
+├─ Platform: 0.1 SOL (1%) → Platform-wide
 │  ├─ Platform Treasury: 0.05 SOL (0.5%)
 │  └─ $YOINK Buyback: 0.05 SOL (0.5%)
-├─ Creator: 0.08 SOL (0.8%)
-├─ Early Bird Pool: 0.12 SOL (1.2%)
-└─ Treasury (Buyback): 0.1 SOL (1%)
+│
+├─ Creator: 0.08 SOL (0.8%) → $DOGE creator only
+├─ Early Bird Pool: 0.12 SOL (1.2%) → $DOGE first 20 buyers
+└─ Treasury (Buyback): 0.1 SOL (1%) → Buys & burns $DOGE only
 ```
 
-### Example 2: 100 SOL Sell Transaction
+### Example 2: 100 SOL Sell Transaction on $PEPE Token
 
 ```
 Total Fee: 4 SOL (4%)
 
 Distribution:
-├─ Platform: 1 SOL (1%)
+├─ Platform: 1 SOL (1%) → Platform-wide
 │  ├─ Platform Treasury: 0.5 SOL (0.5%)
 │  └─ $YOINK Buyback: 0.5 SOL (0.5%)
-├─ Creator: 0.8 SOL (0.8%)
-├─ Early Bird Pool: 1.2 SOL (1.2%)
-└─ Treasury (Buyback): 1 SOL (1%)
+│
+├─ Creator: 0.8 SOL (0.8%) → $PEPE creator only
+├─ Early Bird Pool: 1.2 SOL (1.2%) → $PEPE first 20 buyers
+└─ Treasury (Buyback): 1 SOL (1%) → Buys & burns $PEPE only
 ```
+
+{% hint style="warning" %}
+**Key Takeaway:**
+
+3% of every transaction (Creator + Early Birds + Treasury) stays within that token's ecosystem.
+
+Only 1% goes to the platform, and half of that (0.5%) buys back $YOINK.
+{% endhint %}
+
+---
+
+---
 
 ## Volume = Fees = Ecosystem Growth
 
-The fee system creates a positive feedback loop:
+The fee system creates a positive feedback loop **for each token's ecosystem:**
 
 ```
-More Trading Volume
+More Trading Volume (on Token X)
         ↓
 More Fees Generated
         ↓
-Larger Buyback Treasuries
+├─ Larger Creator Earnings (Token X creator)
+├─ Larger Early Bird Pool (Token X early birds)
+├─ Larger Buyback Treasury (Token X support)
+└─ More $YOINK Buybacks (platform-wide)
         ↓
-Stronger Price Support
+Stronger Token X Ecosystem
         ↓
 More Confident Traders
         ↓
@@ -119,32 +195,41 @@ More Trading Volume
 (cycle continues)
 ```
 
-### Benefits by Participant
+---
 
-**For Traders:**
-* Transparent, predictable fees
-* Automatic price support via buybacks
+## Benefits by Participant
+
+### For Traders 📊
+* Transparent, predictable fees (4% flat)
+* Automatic price support via token-specific buybacks
 * No hidden costs or surprise charges
+* Early bird opportunities on every token
 
-**For Creators:**
-* Earn 0.8% on all trades forever
-* Incentive to promote and grow your token
+### For Creators 🎨
+* Earn 0.8% on all trades of your token forever
 * Revenue continues even after Raydium graduation
+* Incentive to promote and grow your community
+* Passive income from your token's success
 
-**For Early Birds:**
+### For Early Birds 🐦
 * 1.2% of all volume shared among first 20 buyers
 * Significant rewards for early discovery
+* Earn from every trade of tokens you discovered early
 * Risk-reward balanced incentive
 
-**For Platform:**
-* Sustainable operations funding
-* Continuous development resources
-* Long-term viability
+### For Token Holders 💎
+* Automatic buyback protection for each token
+* Treasury grows with volume, creating price support
+* Deflationary mechanism (burns reduce supply)
+* Confidence in downside protection
 
-**For $YOINK Holders:**
-* Constant buyback pressure from platform fees
-* Value accrual from entire platform volume
-* Flywheel mechanism benefits all holders
+### For $YOINK Holders 🚀
+* Constant buyback pressure from ALL platform volume
+* Value accrual from entire ecosystem success
+* Flywheel mechanism benefits from every token
+* Platform growth = $YOINK growth
+
+---
 
 ## Fee Comparison
 
@@ -155,31 +240,36 @@ More Trading Volume
 | **Traditional DEX** | 0.25-0.3% | 0% | ❌ No | ❌ No |
 
 {% hint style="info" %}
-**Why Higher Fees?**
+### Why Higher Fees?
 
 Yoink's 4% fee might seem higher, but it includes:
-- Automatic buyback protection (2% total)
-- Creator compensation (0.8%)
-- Early supporter rewards (1.2%)
-- Sustainable platform development
 
-You're not just paying for a trade—you're investing in ecosystem features that protect your investment.
+✅ **Automatic buyback protection** (2% total - treasury + platform)  
+✅ **Creator compensation** (0.8% - ongoing revenue)  
+✅ **Early supporter rewards** (1.2% - incentivizes discovery)  
+✅ **Sustainable platform development** (0.5% - operations)  
+✅ **$YOINK flywheel** (0.5% - constant buyback)
+
+**You're not just paying for a trade—you're investing in ecosystem features that protect and grow your investment.**
 {% endhint %}
+
+---
 
 ## Fee Collection & Distribution
 
-### Automatic & Trustless
+### Automatic & Trustless ⚡
 
 * All fees collected automatically via smart contract
-* No manual intervention required
+* No manual intervention required or possible
 * Transparent on-chain tracking
 * Immediate distribution to respective pools
 
-### Real-Time Tracking
+### Real-Time Tracking 📊
 
-* View fee accumulation on token pages
-* Monitor treasury growth
-* Track early bird pool size
+* View fee accumulation on each token's page
+* Monitor treasury growth for specific tokens
+* Track early bird pool size per token
+* See creator earnings in real-time
 * See creator earnings in real-time
 
 ### On-Chain Verification
