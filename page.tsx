@@ -516,7 +516,7 @@ export function EarlyBirdsSeats({ coinAddress, userWallet, tokenSymbol = "tokens
       {/* Info Section: How it works + Pool data */}
       <div className="px-2 py-3 space-y-2">
         <p className="text-sm text-muted-foreground leading-relaxed">
-          First 50 buyers share 2% of all trading fees equally when curve completes.
+          First 20 buyers (minimum 0.1 SOL) share 1% of all trading fees equally when curve completes.
         </p>
         <p className="text-sm text-red-400 font-semibold leading-relaxed">
           Selling = permanent disqualification.

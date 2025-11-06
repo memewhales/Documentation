@@ -32,7 +32,7 @@ The Yoink SDK enables developers to build powerful trading applications with:
 {% hint style="warning" %}
 **⛓️ Solana Network Integration**
 - **Framework**: Built on Solana using Anchor framework
-- **Program ID**: `HbiDw6U515iWwHQ4edjmceT24ST7akg7z5rhXRhBac4J`
+- **Program ID**: `HxoYv3DiAaUVhsRaficwm5B8dyk2ShnUZHRHxu62G3gM`
 - **Network Support**: Both testnet (Solana testnet) and mainnet
 - **Wallet Integration**: Compatible with all major Solana wallets
 {% endhint %}

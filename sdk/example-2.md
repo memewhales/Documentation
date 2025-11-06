@@ -319,7 +319,7 @@ async function main() {
     
     // Token mints to track
     tokenMints: [
-      "HbiDw6U515iWwHQ4edjmceT24ST7akg7z5rhXRhBac4J",
+      "HxoYv3DiAaUVhsRaficwm5B8dyk2ShnUZHRHxu62G3gM",
       // Add more token mint addresses
     ],
     

@@ -10,7 +10,7 @@ use anchor_spl::{
     token::{ self, Mint, MintTo, Token, TokenAccount },
 };
 
-declare_id!("HbiDw6U515iWwHQ4edjmceT24ST7akg7z5rhXRhBac4J");
+declare_id!("HxoYv3DiAaUVhsRaficwm5B8dyk2ShnUZHRHxu62G3gM");
 
 pub mod native_mint {
     use anchor_lang::declare_id;

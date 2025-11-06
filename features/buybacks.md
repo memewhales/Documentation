@@ -39,37 +39,47 @@ Each token on Yoink has a **buyback treasury** that:
 Every Trade → Trading Fee → Buyback Treasury
 ```
 
-* ~20% of each trade's fees go to buyback treasury
+* A percentage of each trade's fees go to buyback treasury
 * Treasury accumulates SOL over time
 * More trading = larger treasury = stronger buybacks
 
-### 2. Price Monitoring
+### 2. Price Monitoring with EMA
 
 The system continuously monitors:
 
-* **Current Price**: Real-time token price
-* **EMA (Exponential Moving Average)**: Price trend indicator
+* **Current Price**: Real-time token price from bonding curve
+* **EMA (Exponential Moving Average)**: Fast-responding price trend (50% alpha)
+* **Price Drop Detection**: Triggers when price falls 10% below EMA
 * **Treasury Balance**: Available SOL for buybacks
-* **Market Conditions**: Optimal buyback timing
+
+**Simplified Trigger Logic:**
+- ✅ Single, clear condition: Price drops 10% below EMA
+- ✅ Fast EMA response (50% alpha) for timely support
+- ✅ No complex backing calculations - purely EMA-based
+- ✅ Easy to visualize and predict on charts
 
 ### 3. Automatic Execution
 
-When price drops below EMA:
+When price drops 10% below EMA:
 
-1. **Trigger Detected**: Price < EMA for specified period
-2. **Buyback Initiated**: Treasury executes buy order
-3. **Tokens Purchased**: Market buy at current price
-4. **Tokens Burned**: Bought tokens permanently removed
-5. **Supply Reduced**: Total circulating supply decreases
+1. **Trigger Detected**: Price < 90% of EMA
+2. **Budget Calculated**: 60% of treasury allocated for buyback
+3. **Buyback Executed**: Internal purchase from bonding curve
+4. **SOL Moved**: Treasury SOL → Curve liquidity (internal transfer)
+5. **Tokens Burned**: Purchased tokens permanently removed from supply
+6. **Event Logged**: Burn visible on-chain, buyback recorded in logs
+
+**Note:** The "buy" happens internally - SOL moves from treasury vault to curve liquidity vault within the same account. Only the final burn transaction appears on Solana Explorer.
 
 ### 4. Visual Indicators
 
 On the TradingView chart, burn events appear as:
 
-* 🔥 **Burn Marks**: Visual indicators on chart
+* 🔥 **Burn Marks**: Visual indicators at buyback points
 * **Timestamp**: When buyback occurred
 * **Amount**: SOL spent and tokens burned
 * **Impact**: Price effect visible
+* **EMA Line**: Shows the 90% threshold where buybacks trigger
 
 ## Benefits of Buybacks
 
@@ -119,47 +129,80 @@ More Trading Activity
 **Exponential Moving Average (EMA)** is a technical indicator that:
 
 * Tracks average price over time
-* Gives more weight to recent prices
-* Smooths out price volatility
-* Identifies price trends
+* Gives more weight to recent prices (50% on Yoink)
+* Smooths out short-term price volatility
+* Identifies price trends and support levels
 
 ### Why Use EMA?
 
-* **Trend Indicator**: Shows if price is above or below trend
-* **Support Level**: Acts as dynamic support line
-* **Buyback Trigger**: Objective, automated trigger point
-* **Market Standard**: Widely used in trading
+* **Trend Indicator**: Shows if price is trending above or below average
+* **Dynamic Support**: Acts as a moving support line that adapts to market
+* **Clear Trigger**: Objective, automated trigger point (90% of EMA)
+* **Fast Response**: 50% alpha means quick adaptation to recent price action
+* **Market Standard**: Widely used and understood by traders
 
-### EMA Settings
+### EMA Settings on Yoink
 
-Default settings for Yoink:
+Production settings:
 
-* **Period**: 20 (20-period EMA)
-* **Timeframe**: 1-hour candles
-* **Calculation**: Exponentially weighted average
+* **Alpha (Smoothing)**: 50% (5,000 bps) - Fast response to recent prices
+* **Trigger Threshold**: 90% of EMA (10% price drop triggers buyback)
+* **Calculation**: Exponentially weighted, updated on every trade
+* **Visualization**: Visible on TradingView charts as trend line
+
+### How to Use EMA
+
+**For Buyers:**
+- EMA shows the trending price level
+- Price near EMA = potential entry with buyback support below
+- 10% below EMA = buyback zone (automatic support kicks in)
+
+**For Sellers:**
+- Selling below EMA may trigger immediate buyback
+- Consider waiting for price to recover above EMA
+- Monitor EMA distance to predict buyback timing
+
+**For Holders:**
+- EMA acts as dynamic support level
+- 10% drop from EMA = buyback protection activates
+- Confidence that downside has automated defense
 
 ## Buyback Scenarios
 
 ### Scenario 1: Gradual Decline
 
-* Price slowly drops below EMA
-* Small, frequent buybacks occur
-* Provides consistent support
-* Prevents further decline
+* Price slowly trends down toward EMA
+* When price hits 90% of EMA, buyback triggers
+* Treasury spends 60% of available SOL
+* Buys up to 40% of on-curve token supply
+* Burns all purchased tokens
+* Creates immediate buying pressure and support
 
 ### Scenario 2: Sharp Drop
 
-* Price crashes below EMA
-* Large buyback triggered
-* Significant buying pressure
-* Often creates bounce
+* Price crashes significantly below EMA
+* Buyback triggers immediately at 90% EMA threshold
+* Large treasury allocation (60%) provides strong support
+* Significant buying pressure from single buyback
+* Often creates price bounce due to supply reduction
+* EMA continues tracking, may trigger again if needed
 
-### Scenario 3: Sideways Action
+### Scenario 3: EMA Testing
 
-* Price oscillates around EMA
-* Periodic small buybacks
-* Maintains price range
-* Accumulates position
+* Price oscillates around EMA line
+* Dips below 90% EMA periodically
+* Multiple smaller buybacks occur over time
+* Each buyback reduces circulating supply
+* Creates stronger support at EMA level
+* Establishes EMA as reliable floor
+
+### Scenario 4: Strong Uptrend
+
+* Price stays well above EMA
+* No buybacks trigger
+* Treasury continues accumulating from trading fees
+* Larger treasury builds up for future support
+* When correction comes, stronger buyback available
 
 ## Treasury Management
 
@@ -248,43 +291,90 @@ On TradingView charts:
 
 ## Advanced Mechanics
 
-### Buyback Timing
+### Buyback Execution Details
 
-Buybacks don't trigger instantly:
+**Internal Transaction Flow:**
+1. **Price Check**: System detects price < 90% of EMA
+2. **Budget Calculation**: 60% of treasury allocated
+3. **Token Calculation**: Converts SOL budget to token amount via bonding curve
+4. **Supply Cap**: Limits purchase to 40% of on-curve tokens
+5. **Internal Transfer**: SOL moves from treasury vault → curve liquidity vault
+6. **State Update**: Curve reserves updated (virtual + real)
+7. **Burn Execution**: Tokens burned from curve's token account
+8. **Event Emission**: TradeEvent logged with buyback flags
 
-* **Confirmation Period**: Price must stay below EMA
-* **Prevents False Triggers**: Avoids noise
-* **Optimal Execution**: Waits for best entry
-* **Gas Efficiency**: Batches when possible
+**Why No "Buy" Transaction on Explorer:**
+- The purchase is internal accounting within the program
+- SOL never leaves the bonding curve account
+- Only moves between internal vaults (treasury → AMM)
+- Result: Treasury down, liquidity up, tokens burned
+- On-chain, you only see the burn transaction
 
-### Treasury Limits
+### Technical Parameters
 
-* **Minimum Balance**: Small reserve always maintained
-* **Maximum Per Buyback**: Limits single transaction size
-* **Rate Limiting**: Prevents manipulation
-* **Smart Execution**: Optimizes timing
+**Current Production Settings:**
+```javascript
+buyback_params: {
+    backingMultBps: 1,        // 0.01% - Effectively disabled
+    emaDropBps: 9000,         // 90% - 10% drop triggers buyback
+    emaAlphaBps: 5000,        // 50% - Fast EMA response
+    spendBps: 6000,           // 60% - Treasury usage per buyback
+    maxSupplyBps: 4000,       // 40% - Max of curve supply per buyback
+    minBackingLamports: 1,    // Effectively 0 - always passes
+    maxBurnPercentageBps: 2500, // 25% - Lifetime total burn limit
+}
+```
+
+### Safety Mechanisms
+
+* **Burn Limit**: Maximum 25% of total supply can ever be burned
+* **Supply Cap**: Single buyback limited to 40% of on-curve tokens
+* **Treasury Reserve**: Always maintains minimum balance
+* **Balance Check**: Verifies sufficient tokens in curve before burn
+* **Overflow Protection**: All arithmetic uses safe math operations
+* **State Validation**: Ensures reserves stay consistent
 
 ## FAQs
 
 ### Can the treasury run out?
 
-Technically yes, but it continuously refills from trading fees. High volume ensures large treasury.
+Technically yes, but it continuously refills from trading fees. More trading = larger treasury = stronger future buybacks.
 
 ### Who controls the buybacks?
 
-Nobody! It's fully automated via smart contracts. No human intervention possible.
+Nobody! It's fully automated via smart contracts based on EMA. No human intervention possible or needed.
 
 ### Can buybacks be disabled?
 
-No. They're permanent features of every token's smart contract.
+No. They're permanent features built into every token's smart contract on creation.
 
-### What happens after token graduates?
+### What happens after token graduates to Raydium?
 
-Buybacks continue even after token moves to Raydium DEX. Treasury persists and accumulates from DEX fees.
+Buybacks continue! Treasury persists and can still accumulate and execute buybacks even after DEX graduation.
 
 ### Do buybacks guarantee price won't fall?
 
-No. Buybacks provide support but can't prevent all price declines. They reduce downside, not eliminate it.
+No. Buybacks provide support at 10% below EMA but can't prevent all price declines. They reduce downside risk, not eliminate it.
+
+### How often do buybacks trigger?
+
+Only when price drops 10% below EMA. Could be frequent during bear markets, rare during bull trends. Depends entirely on price action.
+
+### What if treasury is empty when buyback should trigger?
+
+Buyback won't execute. Treasury needs sufficient funds. It will accumulate from future trades and trigger when refilled.
+
+### Can I see buybacks happening in real-time?
+
+You'll see the burn transaction on Solana Explorer. The internal SOL movement won't show as a separate transaction. Check the token's Buybacks tab for full history.
+
+### Why use 90% EMA instead of 100%?
+
+10% buffer prevents excessive triggers from normal volatility while still providing meaningful support on real drops.
+
+### How is EMA calculated on Yoink?
+
+Uses 50% alpha (fast response). Formula: `new_EMA = (current_price * 0.5) + (old_EMA * 0.5)`. Updates on every trade.
 
 ## Monitoring Buybacks
 
