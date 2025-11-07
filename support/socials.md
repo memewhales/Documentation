@@ -35,5 +35,16 @@ Follow us for:
 
 ---
 
+## 💬 Telegram
+
+**[Join our Telegram Community](https://t.me/+IzhSRGP-nGZhNDg8)**
+
+Connect with the Yoink community:
+- **Live discussions** with traders and creators
+- **Quick support** from community members
+- **Community events** and announcements
+- **Direct engagement** with the team
+
+---
 
 **🚀 Join us in building the future of virality capital markets!**
