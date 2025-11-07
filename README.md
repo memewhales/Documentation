@@ -22,7 +22,7 @@ layout:
 
 <figure><img src=".gitbook/assets/yoinknow.png" alt=""><figcaption></figcaption></figure>
 
-Yoink is a next-generation **internet capital markets platform** on **Solana**, where social content becomes tradable. Users can **speculate on viral creators and moments** from platforms like Twitch — with support for more socials (X/Twitter, TikTok, Instagram) coming soon. Built-in on-chain mechanics like **auto-buybacks** and **Early Bird rewards** make Yoink a new breed of social token launchpad. **Yoink it.**
+Yoink is a next-generation **virality capital markets platform** on **Solana**, where social content becomes tradable. Users can **speculate on viral creators and moments** from platforms like Twitch — with support for more socials (X/Twitter, TikTok, Instagram) coming soon. Built-in on-chain mechanics like **auto-buybacks** and **Early Bird rewards** make Yoink a new breed of social token launchpad. **Yoink it.**
 
 ### What is Yoink?
 
