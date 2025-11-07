@@ -1,6 +1,5 @@
 # 🚀 How $YOINK Launched
 
-## 🌟 The Evolution of Creator Capital Markets
 
 **The internet finally has a market for attention.**
 
@@ -28,7 +27,7 @@ Yoink is a next-generation **virality capital markets platform** on Solana. We'r
     </tr>
     <tr>
       <td><strong>💰 Reward Creators</strong></td>
-      <td>Verified streamers claim trading fees directly from their token's volume. Real earnings, real incentives.</td>
+      <td>Verified streamers and creators claim trading fees directly from their token's volume. Real earnings, real incentives.</td>
     </tr>
     <tr>
       <td><strong>🔄 Buyback Engine</strong></td>
@@ -59,12 +58,14 @@ Every trade on the platform fuels a powerful cycle:
     ↓
 🔄 Token Buybacks 
     ↓
+🔄 Users Rewards 
+    ↓
 🚀 $YOINK Buybacks
     ↓
 ♻️ (Cycle Repeats)
 ```
 
-**We capture the value of attention itself.**  
+**We capture the value of virality itself.**  
 Every viral moment, every clip, every creator—forever tradable, forever valuable.
 {% endhint %}
 
@@ -73,7 +74,7 @@ Every viral moment, every clip, every creator—forever tradable, forever valuab
 ## 🎯 Why We Launched on Pump.fun
 
 {% hint style="info" %}
-We launched $YOINK on **pump.fun** because that's where the attention is.
+We launched $YOINK on **pump.fun** because that's where the attention was at time of launch.
 
 Simple as that. Meet traders where they are, capture the eyeballs, build the community.
 
@@ -86,21 +87,21 @@ Simple as that. Meet traders where they are, capture the eyeballs, build the com
 
 ## 🌌 The Vision
 
-{% hint style="danger" %}
+{% hint style="success" %}
 ### 🔮 Unlocking a New Age of Creator Capital Markets
 
 Yoink is unlocking a **new age of Creator Capital Markets** in the Solana trenches.
 
 #### We're building the infrastructure to:
 
-✅ **Make attention a tradable asset class**  
+✅ **Make attention and virality a tradable asset class**  
 ✅ **Reward creators directly from market activity**  
-✅ **Create sustainable token economies with built-in protection**  
+✅ **Create sustainable token economies with built-in protection for traderrs**  
 ✅ **Bridge social platforms and DeFi seamlessly**
 
 ---
 
-**Every viral moment has value. We're building the market to capture it.** 💎
+**Every viral moment has value. We're building the market to capture it.** 
 {% endhint %}
 
 ---
