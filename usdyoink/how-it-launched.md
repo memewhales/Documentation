@@ -1,45 +1,42 @@
 # 🚀 How $YOINK Launched
 
-{% hint style="success" %}
 ## 🌟 The Evolution of Creator Capital Markets
 
 **The internet finally has a market for attention.**
 
 Yoink is a next-generation **virality capital markets platform** on Solana. We're not another memecoin launchpad—we're the evolution of Creator Capital Markets (CCM), transforming viral moments into liquid, tradable assets.
+
+{% hint style="info" %}
+**CONTRACT ADDRESS:** `[REPLACE]`
 {% endhint %}
 
 ---
 
 ## 💎 What Makes Yoink Different
 
-<table data-view="cards">
+<table data-card-size="large" data-view="cards">
   <thead>
     <tr>
       <th></th>
       <th></th>
-      <th data-hidden data-card-cover data-type="files"></th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <td><strong>🎯 Trade Creators</strong></td>
-      <td>Speculate on who's going viral next, or support your favorite streamers. Each token represents a real creator and their viral potential.</td>
-      <td></td>
+      <td><strong>🎯 Trade Content</strong></td>
+      <td>Speculate on viral moments and trending content. Each token represents real creators and their content's viral potential.</td>
     </tr>
     <tr>
       <td><strong>💰 Reward Creators</strong></td>
-      <td>Verified streamers claim a cut of trading fees directly from their token's volume. Real earnings, real incentives.</td>
-      <td></td>
+      <td>Verified streamers claim trading fees directly from their token's volume. Real earnings, real incentives.</td>
     </tr>
     <tr>
       <td><strong>🔄 Buyback Engine</strong></td>
-      <td>Each token builds its own treasury that automatically buys back and burns when price drops below EMA. Built-in price support.</td>
-      <td></td>
+      <td>Each token builds a treasury that auto-buys and burns when price drops below EMA. Built-in price support.</td>
     </tr>
     <tr>
       <td><strong>🐦 Early Bird Bonus</strong></td>
-      <td>The first 20 holders of any token share a reward pool funded by trading volume. Sell and you lose your seat—incentivizing true early supporters.</td>
-      <td></td>
+      <td>First 20 holders share a reward pool from trading volume. Sell and lose your seat—true early supporter incentive.</td>
     </tr>
   </tbody>
 </table>
@@ -76,62 +73,13 @@ Every viral moment, every clip, every creator—forever tradable, forever valuab
 ## 🎯 Why We Launched on Pump.fun
 
 {% hint style="info" %}
-### 🧠 Strategic Launch Decision
+We launched $YOINK on **pump.fun** because that's where the attention is.
 
-We launched $YOINK on **pump.fun** first—the current epicenter of attention and liquidity in the Solana ecosystem.
+Simple as that. Meet traders where they are, capture the eyeballs, build the community.
 
-#### Why This Mattered:
+**Fair launch. No VCs. Pure community-driven from day one.**
 
-**🎪 Capture Mainstream Eyes**  
-Pump.fun has the eyeballs. Launching there meant instant visibility to the exact audience we're building for.
-
-**✅ Prove the Concept**  
-Before asking people to use our platform, we showed them we understand how to build attention-driven markets.
-
-**🤝 Bootstrap Community**  
-Meet traders where they are, build trust, then invite them to experience the next evolution.
-
-**⚖️ Fair Launch**  
-No VC allocation, no insider rounds—pure community-driven from day one.
-
----
-
-### 📍 The Strategy
-
-```
-Launch where attention lives 
-    → Build community 
-        → Onboard to platform 
-            → Grow together
-```
-
-We practiced what we preach: **virality first, everything else follows.** 🎯
-{% endhint %}
-
----
-
-## 🗺️ From Pump.fun to Protocol
-
-Launching on pump.fun wasn't the endgame—it was the **catalyst**.
-
-{% hint style="success" %}
-### ✅ Phase 1: Launch (COMPLETE)
-Launch $YOINK on pump.fun, capture attention, build initial community.
-{% endhint %}
-
-{% hint style="success" %}
-### ✅ Phase 2: Platform Live (COMPLETE)
-Yoink platform launches with full Creator Capital Markets infrastructure—buybacks, early birds, creator fees, streaming integration.
-{% endhint %}
-
-{% hint style="warning" %}
-### 🚧 Phase 3: Ecosystem Growth (IN PROGRESS)
-Expand to more platforms (X/Twitter, TikTok, Instagram), scale creator network, deepen liquidity.
-{% endhint %}
-
-{% hint style="info" %}
-### 🎯 Phase 4: CCM Standard (FUTURE)
-Establish Yoink as the dominant protocol for creator capital markets across all social platforms.
+[Learn more about $YOINK on pump.fun →](#)
 {% endhint %}
 
 ---
@@ -157,18 +105,6 @@ Yoink is unlocking a **new age of Creator Capital Markets** in the Solana trench
 
 ---
 
-## 🚀 Join the Movement
-
-{% hint style="success" %}
-### 🎉 $YOINK is live. The platform is live. The future of Creator Capital Markets is here.
-
-Start trading creators. Support your favorites. Capture virality.
-
-### **Yoink it.** 🚀
-{% endhint %}
-
----
-
 ## 📚 Next Steps
 
-<table data-view="cards"><thead><tr><th></th><th></th><th data-hidden data-card-target data-type="content-ref"></th></tr></thead><tbody><tr><td><strong>🗺️ $YOINK Roadmap</strong></td><td>See what's coming next for the platform</td><td><a href="roadmap.md">roadmap.md</a></td></tr><tr><td><strong>♻️ $YOINK Flywheel</strong></td><td>How platform fees power $YOINK buybacks</td><td><a href="constant-buyback.md">constant-buyback.md</a></td></tr><tr><td><strong>📈 Start Trading</strong></td><td>Begin trading creators on Yoink</td><td><a href="../yoink/how-to-trade.md">how-to-trade.md</a></td></tr></tbody></table>
+<table data-view="cards"><thead><tr><th></th><th></th><th data-hidden data-card-target data-type="content-ref"></th></tr></thead><tbody><tr><td><strong>♻️ $YOINK Flywheel</strong></td><td>How platform fees power $YOINK buybacks</td><td><a href="constant-buyback.md">constant-buyback.md</a></td></tr><tr><td><strong>📈 Trade Content</strong></td><td>Begin trading on Yoink platform</td><td><a href="../yoink/how-to-trade.md">how-to-trade.md</a></td></tr><tr><td><strong>💰 Fee Structure</strong></td><td>Understand how fees work on Yoink</td><td><a href="../yoink/fees.md">fees.md</a></td></tr></tbody></table>
