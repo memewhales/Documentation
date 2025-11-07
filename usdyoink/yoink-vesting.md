@@ -1,7 +1,5 @@
 # 🔒 $YOINK Vesting
 
-## Team Allocation & Lock
-
 **Transparency matters.** When we launched $YOINK on pump.fun, the team purchased **5% of the total supply** and immediately locked it using **Streamflow Finance**.
 
 {% hint style="info" %}
